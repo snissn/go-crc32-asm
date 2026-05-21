@@ -132,11 +132,6 @@ func (d *digest) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (d *digest) Clone() (hash.Cloner, error) {
-	clone := *d
-	return &clone, nil
-}
-
 func tableSum(t *Table) uint32 {
 	var a [1024]byte
 	b := a[:0]
