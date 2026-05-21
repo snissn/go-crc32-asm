@@ -192,19 +192,12 @@ func TestStdlibCompatibleHashBinaryState(t *testing.T) {
 				t.Fatalf("UnmarshalBinary: %v", err)
 			}
 			_, _ = restored.Write(data[12345:])
-			if got, want := restored.Sum32(), crc32.Checksum(data, tc.stdTab); got != want {
+			want := crc32.Checksum(data, tc.stdTab)
+			if got := restored.Sum32(); got != want {
 				t.Fatalf("restored Sum32 got=%08x want=%08x", got, want)
 			}
 
-			cloned, err := fast.(hash.Cloner).Clone()
-			if err != nil {
-				t.Fatalf("Clone: %v", err)
-			}
-			cloneHash := cloned.(hash.Hash32)
-			_, _ = cloneHash.Write(data[12345:])
-			if got, want := cloneHash.Sum32(), crc32.Checksum(data, tc.stdTab); got != want {
-				t.Fatalf("cloned Sum32 got=%08x want=%08x", got, want)
-			}
+			cloneHashForTest(t, fast, data[12345:], want)
 		})
 	}
 }
