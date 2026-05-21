@@ -31,7 +31,8 @@ go test -run '^$' -bench BenchmarkChecksumIEEE -benchtime=1s -count=3
 ```
 
 `BenchmarkGomapHashTournamentSlice` reuses the gomap hash tournament block
-sizes and a small competitor set:
+sizes and a small competitor set, including Go stdlib CRC-32/IEEE, Go stdlib
+CRC-32C/Castagnoli, `github.com/klauspost/crc32`, `FarmHash64`, and `XXH3_64`:
 
 ```sh
 go test -run '^$' -bench BenchmarkGomapHashTournamentSlice -benchtime=1s -count=3
@@ -68,3 +69,26 @@ That is roughly 2.5x to 2.75x faster than Go's `hash/crc32.ChecksumIEEE` on
 the same machine for these sizes. It is also in the same performance class as a
 local `libdeflate_crc32` C benchmark on the same host, which measured about
 62-64 GB/s across these block sizes.
+
+`github.com/klauspost/crc32` comparison:
+
+- On Apple M3, `github.com/klauspost/crc32` does not have the `arm64`
+  `PMULL`/`EOR3` path used here. In `BenchmarkGomapHashTournamentSlice`, it
+  measured about 2.6-2.7 GB/s for both CRC-32/IEEE and CRC-32C/Castagnoli,
+  while this package measured about 57-59 GB/s for CRC-32/IEEE.
+- On Intel i5-11400F, `github.com/klauspost/crc32` measured about 23-24 GB/s
+  for CRC-32/IEEE and about 29-30 GB/s for CRC-32C/Castagnoli at the gomap
+  tournament block sizes. This package measured about 60-64 GB/s for
+  CRC-32/IEEE on the same run.
+
+CRC naming note:
+
+- CRC-32/IEEE is the classic Ethernet/gzip/zip/png polynomial. It is the value
+  returned by Go's `hash/crc32.ChecksumIEEE`, and it is what this package
+  implements.
+- CRC-32C/Castagnoli is a different 32-bit CRC polynomial. It returns a
+  different checksum for the same bytes. It is often fast on x86 because the
+  SSE4.2 `CRC32` instruction computes the Castagnoli polynomial directly.
+- The two are not drop-in compatible on disk unless the stored checksum format
+  is allowed to change. Both produce 32-bit CRCs, but the polynomial and output
+  values differ.

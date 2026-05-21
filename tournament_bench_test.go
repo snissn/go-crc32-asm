@@ -1,15 +1,17 @@
 package crc32asm
 
 import (
-	"hash/crc32"
+	stdcrc32 "hash/crc32"
 	"testing"
 
 	farm "github.com/dgryski/go-farm"
+	klauscrc32 "github.com/klauspost/crc32"
 	"github.com/zeebo/xxh3"
 )
 
 var (
-	crc32cTable      = crc32.MakeTable(crc32.Castagnoli)
+	stdCRC32CTable   = stdcrc32.MakeTable(stdcrc32.Castagnoli)
+	klausCRC32CTable = klauscrc32.MakeTable(klauscrc32.Castagnoli)
 	tournamentSink32 uint32
 	tournamentSink64 uint64
 )
@@ -40,14 +42,28 @@ func BenchmarkGomapHashTournamentSlice(b *testing.B) {
 		b.Run(size.name+"/CRC32_IEEE_Stdlib", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
-				tournamentSink32 ^= crc32.ChecksumIEEE(data)
+				tournamentSink32 ^= stdcrc32.ChecksumIEEE(data)
 			}
 		})
 
-		b.Run(size.name+"/CRC32C_Castagnoli_TreeDB", func(b *testing.B) {
+		b.Run(size.name+"/CRC32_IEEE_Klauspost", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
-				tournamentSink32 ^= crc32.Checksum(data, crc32cTable)
+				tournamentSink32 ^= klauscrc32.ChecksumIEEE(data)
+			}
+		})
+
+		b.Run(size.name+"/CRC32C_Castagnoli_Stdlib", func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				tournamentSink32 ^= stdcrc32.Checksum(data, stdCRC32CTable)
+			}
+		})
+
+		b.Run(size.name+"/CRC32C_Castagnoli_Klauspost", func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				tournamentSink32 ^= klauscrc32.Checksum(data, klausCRC32CTable)
 			}
 		})
 
