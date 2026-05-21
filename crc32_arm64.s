@@ -1,0 +1,76 @@
+//go:build arm64
+
+#include "textflag.h"
+
+// func crc32IEEE4Way(p []byte, chunkLen uintptr) (uint32, uint32, uint32, uint32)
+TEXT ·crc32IEEE4Way(SB),NOSPLIT,$0-48
+	MOVD	p_base+0(FP), R0
+	MOVD	chunkLen+24(FP), R1
+
+	MOVD	R0, R3
+	ADD	R1, R0, R4
+	ADD	R1, R4, R5
+	ADD	R1, R5, R6
+
+	MOVD	$-1, R7
+	MOVD	$-1, R8
+	MOVD	$-1, R9
+	MOVD	$-1, R10
+
+loop8:
+	CMP	$8, R1
+	BLT	tail4
+	MOVD.P	8(R3), R11
+	MOVD.P	8(R4), R12
+	MOVD.P	8(R5), R13
+	MOVD.P	8(R6), R14
+	CRC32X	R11, R7
+	CRC32X	R12, R8
+	CRC32X	R13, R9
+	CRC32X	R14, R10
+	SUB	$8, R1
+	JMP	loop8
+
+tail4:
+	TBZ	$2, R1, tail2
+	MOVWU.P	4(R3), R11
+	MOVWU.P	4(R4), R12
+	MOVWU.P	4(R5), R13
+	MOVWU.P	4(R6), R14
+	CRC32W	R11, R7
+	CRC32W	R12, R8
+	CRC32W	R13, R9
+	CRC32W	R14, R10
+
+tail2:
+	TBZ	$1, R1, tail1
+	MOVHU.P	2(R3), R11
+	MOVHU.P	2(R4), R12
+	MOVHU.P	2(R5), R13
+	MOVHU.P	2(R6), R14
+	CRC32H	R11, R7
+	CRC32H	R12, R8
+	CRC32H	R13, R9
+	CRC32H	R14, R10
+
+tail1:
+	TBZ	$0, R1, done
+	MOVBU	(R3), R11
+	MOVBU	(R4), R12
+	MOVBU	(R5), R13
+	MOVBU	(R6), R14
+	CRC32B	R11, R7
+	CRC32B	R12, R8
+	CRC32B	R13, R9
+	CRC32B	R14, R10
+
+done:
+	MVNW	R7, R7
+	MVNW	R8, R8
+	MVNW	R9, R9
+	MVNW	R10, R10
+	MOVW	R7, ret+32(FP)
+	MOVW	R8, ret1+36(FP)
+	MOVW	R9, ret2+40(FP)
+	MOVW	R10, ret3+44(FP)
+	RET
