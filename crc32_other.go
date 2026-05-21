@@ -9,3 +9,11 @@ func checksumIEEE(data []byte) uint32 {
 func checksumCastagnoli(data []byte) uint32 {
 	return checksumCastagnoliFallback(data)
 }
+
+func updateIEEEFast(crc uint32, p []byte) uint32 {
+	return updateIEEEFallback(crc, p)
+}
+
+func updateCastagnoliFast(crc uint32, p []byte) uint32 {
+	return updateCastagnoliFallback(crc, p)
+}
