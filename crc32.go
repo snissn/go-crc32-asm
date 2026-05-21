@@ -169,7 +169,7 @@ func updateCastagnoli(crc uint32, p []byte) uint32 {
 	if crc == 0 {
 		return checksumCastagnoli(p)
 	}
-	return combineCastagnoliCached(crc, checksumCastagnoli(p), int64(len(p)))
+	return stdcrc32.Update(crc, castagnoliTable, p)
 }
 
 var zeroAppendOps sync.Map
