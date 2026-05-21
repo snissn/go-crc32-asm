@@ -10,6 +10,44 @@ import (
 
 var benchSink uint32
 
+type binaryAppender interface {
+	AppendBinary([]byte) ([]byte, error)
+}
+
+func requireBinaryMarshaler(t *testing.T, name string, h hash.Hash32) encoding.BinaryMarshaler {
+	t.Helper()
+	marshaler, ok := h.(encoding.BinaryMarshaler)
+	if !ok {
+		t.Fatalf("%s hash does not implement encoding.BinaryMarshaler", name)
+	}
+	return marshaler
+}
+
+func requireBinaryUnmarshaler(t *testing.T, name string, h hash.Hash32) encoding.BinaryUnmarshaler {
+	t.Helper()
+	unmarshaler, ok := h.(encoding.BinaryUnmarshaler)
+	if !ok {
+		t.Fatalf("%s hash does not implement encoding.BinaryUnmarshaler", name)
+	}
+	return unmarshaler
+}
+
+func requireBinaryAppender(t *testing.T, name string, h hash.Hash32) binaryAppender {
+	t.Helper()
+	appender, ok := h.(binaryAppender)
+	if !ok {
+		t.Fatalf("%s hash does not implement AppendBinary", name)
+	}
+	return appender
+}
+
+func mismatchedTable(tab *Table) *Table {
+	if tab == IEEETable {
+		return MakeTable(Castagnoli)
+	}
+	return IEEETable
+}
+
 func TestChecksumIEEE(t *testing.T) {
 	for n := 0; n <= 1<<20; n = nextSize(n) {
 		data := makeInput(n)
@@ -90,6 +128,53 @@ func TestStdlibCompatibleChecksumAndUpdate(t *testing.T) {
 	}
 }
 
+func TestUpdateNonZeroSeeds(t *testing.T) {
+	prefix := makeInput(4096)
+	for _, tc := range []struct {
+		name    string
+		stdTab  *crc32.Table
+		fastTab *Table
+		seeds   []uint32
+	}{
+		{
+			name:    "IEEE",
+			stdTab:  crc32.IEEETable,
+			fastTab: IEEETable,
+			seeds:   []uint32{1, 0x12345678, 0xffffffff, crc32.ChecksumIEEE(prefix)},
+		},
+		{
+			name:    "Castagnoli",
+			stdTab:  crc32.MakeTable(crc32.Castagnoli),
+			fastTab: MakeTable(Castagnoli),
+			seeds:   []uint32{1, 0x12345678, 0xffffffff, crc32.Checksum(prefix, crc32.MakeTable(crc32.Castagnoli))},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, n := range []int{
+				0, 1,
+				63, 64, 65,
+				127, 128, 129,
+				191, 192, 193,
+				255, 256, 257,
+				511, 512, 513,
+				575, 576, 577,
+				1023, 1024, 1025,
+				(16 << 10) - 1, 16 << 10, (16 << 10) + 1,
+				64 << 10, 256 << 10, 512 << 10, 1 << 20,
+			} {
+				data := makeInput(n)
+				for _, seed := range tc.seeds {
+					got := Update(seed, tc.fastTab, data)
+					want := crc32.Update(seed, tc.stdTab, data)
+					if got != want {
+						t.Fatalf("len=%d seed=%08x got=%08x want=%08x", n, seed, got, want)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestStdlibCompatibleHash32(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -153,8 +238,8 @@ func TestStdlibCompatibleHashBinaryState(t *testing.T) {
 			_, _ = fast.Write(data[:12345])
 			_, _ = std.Write(data[:12345])
 
-			fastMarshaler := fast.(encoding.BinaryMarshaler)
-			stdMarshaler := std.(encoding.BinaryMarshaler)
+			fastMarshaler := requireBinaryMarshaler(t, "fast", fast)
+			stdMarshaler := requireBinaryMarshaler(t, "stdlib", std)
 			fastState, err := fastMarshaler.MarshalBinary()
 			if err != nil {
 				t.Fatalf("fast MarshalBinary: %v", err)
@@ -167,15 +252,11 @@ func TestStdlibCompatibleHashBinaryState(t *testing.T) {
 				t.Fatalf("MarshalBinary mismatch got=%x want=%x", fastState, stdState)
 			}
 
-			fastAppendState, err := fast.(interface {
-				AppendBinary([]byte) ([]byte, error)
-			}).AppendBinary([]byte("state:"))
+			fastAppendState, err := requireBinaryAppender(t, "fast", fast).AppendBinary([]byte("state:"))
 			if err != nil {
 				t.Fatalf("fast AppendBinary: %v", err)
 			}
-			if stdAppender, ok := std.(interface {
-				AppendBinary([]byte) ([]byte, error)
-			}); ok {
+			if stdAppender, ok := std.(binaryAppender); ok {
 				stdAppendState, err := stdAppender.AppendBinary([]byte("state:"))
 				if err != nil {
 					t.Fatalf("stdlib AppendBinary: %v", err)
@@ -188,13 +269,18 @@ func TestStdlibCompatibleHashBinaryState(t *testing.T) {
 			}
 
 			restored := New(tc.fastTab)
-			if err := restored.(encoding.BinaryUnmarshaler).UnmarshalBinary(fastState); err != nil {
+			if err := requireBinaryUnmarshaler(t, "restored", restored).UnmarshalBinary(fastState); err != nil {
 				t.Fatalf("UnmarshalBinary: %v", err)
 			}
 			_, _ = restored.Write(data[12345:])
 			want := crc32.Checksum(data, tc.stdTab)
 			if got := restored.Sum32(); got != want {
 				t.Fatalf("restored Sum32 got=%08x want=%08x", got, want)
+			}
+
+			mismatched := New(mismatchedTable(tc.fastTab))
+			if err := requireBinaryUnmarshaler(t, "mismatched", mismatched).UnmarshalBinary(fastState); err == nil {
+				t.Fatalf("UnmarshalBinary succeeded with mismatched table")
 			}
 
 			cloneHashForTest(t, fast, data[12345:], want)
@@ -285,7 +371,7 @@ func BenchmarkChecksumIEEE(b *testing.B) {
 
 func BenchmarkChecksumCastagnoli(b *testing.B) {
 	stdTab := crc32.MakeTable(crc32.Castagnoli)
-	asmTab := MakeTable(Castagnoli)
+	pkgTab := MakeTable(Castagnoli)
 	for _, size := range []struct {
 		name string
 		n    int
@@ -296,16 +382,16 @@ func BenchmarkChecksumCastagnoli(b *testing.B) {
 		{name: "1MiB", n: 1 << 20},
 	} {
 		data := makeInput(size.n)
-		b.Run(size.name+"/asm_direct", func(b *testing.B) {
+		b.Run(size.name+"/package_direct", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
 				benchSink ^= ChecksumCastagnoli(data)
 			}
 		})
-		b.Run(size.name+"/asm_table", func(b *testing.B) {
+		b.Run(size.name+"/package_table", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
-				benchSink ^= Checksum(data, asmTab)
+				benchSink ^= Checksum(data, pkgTab)
 			}
 		})
 		b.Run(size.name+"/stdlib", func(b *testing.B) {
@@ -319,7 +405,7 @@ func BenchmarkChecksumCastagnoli(b *testing.B) {
 
 func BenchmarkUpdateNonZero(b *testing.B) {
 	stdCastagnoliTab := crc32.MakeTable(crc32.Castagnoli)
-	asmCastagnoliTab := MakeTable(Castagnoli)
+	pkgCastagnoliTab := MakeTable(Castagnoli)
 	prefix := makeInput(4096)
 	ieeeSeed := crc32.ChecksumIEEE(prefix)
 	castagnoliSeed := crc32.Checksum(prefix, stdCastagnoliTab)
@@ -336,7 +422,7 @@ func BenchmarkUpdateNonZero(b *testing.B) {
 		{name: "1MiB", n: 1 << 20},
 	} {
 		data := makeInput(size.n)
-		b.Run(size.name+"/IEEE/asm", func(b *testing.B) {
+		b.Run(size.name+"/IEEE/package", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
 				benchSink ^= Update(ieeeSeed, IEEETable, data)
@@ -348,10 +434,10 @@ func BenchmarkUpdateNonZero(b *testing.B) {
 				benchSink ^= crc32.Update(ieeeSeed, crc32.IEEETable, data)
 			}
 		})
-		b.Run(size.name+"/Castagnoli/asm", func(b *testing.B) {
+		b.Run(size.name+"/Castagnoli/package", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
-				benchSink ^= Update(castagnoliSeed, asmCastagnoliTab, data)
+				benchSink ^= Update(castagnoliSeed, pkgCastagnoliTab, data)
 			}
 		})
 		b.Run(size.name+"/Castagnoli/stdlib", func(b *testing.B) {
@@ -365,7 +451,7 @@ func BenchmarkUpdateNonZero(b *testing.B) {
 
 func BenchmarkHashWrite(b *testing.B) {
 	stdCastagnoliTab := crc32.MakeTable(crc32.Castagnoli)
-	asmCastagnoliTab := MakeTable(Castagnoli)
+	pkgCastagnoliTab := MakeTable(Castagnoli)
 	data := makeInput(1 << 20)
 
 	for _, chunk := range []struct {
@@ -377,7 +463,7 @@ func BenchmarkHashWrite(b *testing.B) {
 		{name: "64KiB", n: 64 << 10},
 		{name: "1MiB", n: 1 << 20},
 	} {
-		b.Run(chunk.name+"/IEEE/asm", func(b *testing.B) {
+		b.Run(chunk.name+"/IEEE/package", func(b *testing.B) {
 			h := NewIEEE()
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
@@ -395,8 +481,8 @@ func BenchmarkHashWrite(b *testing.B) {
 				benchSink ^= h.Sum32()
 			}
 		})
-		b.Run(chunk.name+"/Castagnoli/asm", func(b *testing.B) {
-			h := New(asmCastagnoliTab)
+		b.Run(chunk.name+"/Castagnoli/package", func(b *testing.B) {
+			h := New(pkgCastagnoliTab)
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
 				h.Reset()

@@ -16,6 +16,14 @@ func checksum(block []byte) uint32 {
 }
 ```
 
+The mirrored API includes:
+
+- Constants: `Size`, `IEEE`, `Castagnoli`, and `Koopman`.
+- Table API: `Table`, `IEEETable`, and `MakeTable`.
+- Checksum API: `Checksum`, `ChecksumIEEE`, and `Update`.
+- Streaming API: `New` and `NewIEEE` return `hash.Hash32` values with standard
+  `Write`, `Sum32`, `Sum`, `Reset`, `Size`, and `BlockSize` behavior.
+
 Canonical CRC-32/IEEE and CRC-32C/Castagnoli tables get fast paths. `Koopman`
 and custom tables stay bit-compatible with `hash/crc32` through the fallback
 path.
