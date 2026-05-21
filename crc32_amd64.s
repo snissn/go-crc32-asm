@@ -1,0 +1,219 @@
+//go:build amd64
+
+#include "textflag.h"
+
+#define FOLD_MEM(reg, off) \
+	MOVO reg, X9; \
+	PCLMULQDQ $0x00, X0, reg; \
+	PCLMULQDQ $0x11, X0, X9; \
+	PXOR X9, reg; \
+	MOVOU off(SI), X9; \
+	PXOR X9, reg
+
+#define FOLD_REG(src, dst) \
+	MOVO src, X9; \
+	PCLMULQDQ $0x00, X0, src; \
+	PCLMULQDQ $0x11, X0, X9; \
+	PXOR src, dst; \
+	PXOR X9, dst
+
+#define VFOLD_MEM(reg, off) \
+	VMOVDQA reg, Y9; \
+	VPCLMULQDQ $0x00, Y0, reg, reg; \
+	VPCLMULQDQ $0x11, Y0, Y9, Y9; \
+	VPXOR Y9, reg, reg; \
+	VMOVDQU off(SI), Y9; \
+	VPXOR Y9, reg, reg
+
+#define VFOLD_REG(src, dst) \
+	VMOVDQA src, Y9; \
+	VPCLMULQDQ $0x00, Y0, src, src; \
+	VPCLMULQDQ $0x11, Y0, Y9, Y9; \
+	VPXOR src, dst, dst; \
+	VPXOR Y9, dst, dst
+
+#define VFOLD128_REG(src, dst) \
+	MOVO src, X9; \
+	PCLMULQDQ $0x00, X0, src; \
+	PCLMULQDQ $0x11, X0, X9; \
+	PXOR src, dst; \
+	PXOR X9, dst
+
+DATA ·amd64Mult8+0x00(SB)/8, $0x0000000033fff533
+DATA ·amd64Mult8+0x08(SB)/8, $0x00000000910eeec1
+GLOBL ·amd64Mult8(SB), RODATA, $16
+
+DATA ·amd64Mult4+0x00(SB)/8, $0x000000008f352d95
+DATA ·amd64Mult4+0x08(SB)/8, $0x000000001d9513d7
+GLOBL ·amd64Mult4(SB), RODATA, $16
+
+DATA ·amd64Mult2+0x00(SB)/8, $0x00000000f1da05aa
+DATA ·amd64Mult2+0x08(SB)/8, $0x0000000081256527
+GLOBL ·amd64Mult2(SB), RODATA, $16
+
+DATA ·amd64Mult1+0x00(SB)/8, $0x00000000ae689191
+DATA ·amd64Mult1+0x08(SB)/8, $0x00000000ccaa009e
+GLOBL ·amd64Mult1(SB), RODATA, $16
+
+DATA ·amd64Barrett+0x00(SB)/8, $0xb4e5b025f7011641
+DATA ·amd64Barrett+0x08(SB)/8, $0x00000001db710641
+GLOBL ·amd64Barrett(SB), RODATA, $16
+
+DATA ·amd64VMult8+0x00(SB)/8, $0x00000000ce3371cb
+DATA ·amd64VMult8+0x08(SB)/8, $0x00000000e95c1271
+DATA ·amd64VMult8+0x10(SB)/8, $0x00000000ce3371cb
+DATA ·amd64VMult8+0x18(SB)/8, $0x00000000e95c1271
+GLOBL ·amd64VMult8(SB), RODATA, $32
+
+DATA ·amd64VMult4+0x00(SB)/8, $0x0000000033fff533
+DATA ·amd64VMult4+0x08(SB)/8, $0x00000000910eeec1
+DATA ·amd64VMult4+0x10(SB)/8, $0x0000000033fff533
+DATA ·amd64VMult4+0x18(SB)/8, $0x00000000910eeec1
+GLOBL ·amd64VMult4(SB), RODATA, $32
+
+DATA ·amd64VMult2+0x00(SB)/8, $0x000000008f352d95
+DATA ·amd64VMult2+0x08(SB)/8, $0x000000001d9513d7
+DATA ·amd64VMult2+0x10(SB)/8, $0x000000008f352d95
+DATA ·amd64VMult2+0x18(SB)/8, $0x000000001d9513d7
+GLOBL ·amd64VMult2(SB), RODATA, $32
+
+DATA ·amd64VMult1+0x00(SB)/8, $0x00000000f1da05aa
+DATA ·amd64VMult1+0x08(SB)/8, $0x0000000081256527
+DATA ·amd64VMult1+0x10(SB)/8, $0x00000000f1da05aa
+DATA ·amd64VMult1+0x18(SB)/8, $0x0000000081256527
+GLOBL ·amd64VMult1(SB), RODATA, $32
+
+// func crc32IEEEPCLMUL8(crc uint32, p []byte) uint32
+// p length must be a positive multiple of 128 bytes.
+TEXT ·crc32IEEEPCLMUL8(SB), NOSPLIT, $0-36
+	MOVL crc+0(FP), X0
+	MOVQ p_base+8(FP), SI
+	MOVQ p_len+16(FP), CX
+
+	MOVOU 0(SI), X1
+	MOVOU 16(SI), X2
+	MOVOU 32(SI), X3
+	MOVOU 48(SI), X4
+	MOVOU 64(SI), X5
+	MOVOU 80(SI), X6
+	MOVOU 96(SI), X7
+	MOVOU 112(SI), X8
+	PXOR X0, X1
+	ADDQ $128, SI
+	SUBQ $128, CX
+	JZ fold_down
+
+	MOVOA ·amd64Mult8(SB), X0
+
+loop128:
+	FOLD_MEM(X1, 0)
+	FOLD_MEM(X2, 16)
+	FOLD_MEM(X3, 32)
+	FOLD_MEM(X4, 48)
+	FOLD_MEM(X5, 64)
+	FOLD_MEM(X6, 80)
+	FOLD_MEM(X7, 96)
+	FOLD_MEM(X8, 112)
+	ADDQ $128, SI
+	SUBQ $128, CX
+	JNZ loop128
+
+fold_down:
+	MOVOA ·amd64Mult4(SB), X0
+	FOLD_REG(X1, X5)
+	FOLD_REG(X2, X6)
+	FOLD_REG(X3, X7)
+	FOLD_REG(X4, X8)
+
+	MOVOA ·amd64Mult2(SB), X0
+	FOLD_REG(X5, X7)
+	FOLD_REG(X6, X8)
+
+	MOVOA ·amd64Mult1(SB), X0
+	FOLD_REG(X7, X8)
+
+	MOVO X8, X1
+	MOVO X1, X2
+	PCLMULQDQ $0x10, X0, X1
+	PSRLDQ $8, X2
+	PXOR X2, X1
+
+	MOVOA ·amd64Barrett(SB), X0
+	MOVO X1, X2
+	PCLMULQDQ $0x00, X0, X2
+	PCLMULQDQ $0x10, X0, X2
+	PXOR X2, X1
+
+	PEXTRD $2, X1, AX
+	MOVL AX, ret+32(FP)
+	RET
+
+// func crc32IEEEVPCLMUL256(crc uint32, p []byte) uint32
+// p length must be a positive multiple of 256 bytes.
+TEXT ·crc32IEEEVPCLMUL256(SB), NOSPLIT, $0-36
+	MOVL crc+0(FP), X0
+	MOVQ p_base+8(FP), SI
+	MOVQ p_len+16(FP), CX
+
+	VMOVDQU 0(SI), Y1
+	VMOVDQU 32(SI), Y2
+	VMOVDQU 64(SI), Y3
+	VMOVDQU 96(SI), Y4
+	VMOVDQU 128(SI), Y5
+	VMOVDQU 160(SI), Y6
+	VMOVDQU 192(SI), Y7
+	VMOVDQU 224(SI), Y8
+	VPXOR Y0, Y1, Y1
+	ADDQ $256, SI
+	SUBQ $256, CX
+	JZ vfold_down
+
+	VMOVDQA ·amd64VMult8(SB), Y0
+
+vloop256:
+	VFOLD_MEM(Y1, 0)
+	VFOLD_MEM(Y2, 32)
+	VFOLD_MEM(Y3, 64)
+	VFOLD_MEM(Y4, 96)
+	VFOLD_MEM(Y5, 128)
+	VFOLD_MEM(Y6, 160)
+	VFOLD_MEM(Y7, 192)
+	VFOLD_MEM(Y8, 224)
+	ADDQ $256, SI
+	SUBQ $256, CX
+	JNZ vloop256
+
+vfold_down:
+	VMOVDQA ·amd64VMult4(SB), Y0
+	VFOLD_REG(Y1, Y5)
+	VFOLD_REG(Y2, Y6)
+	VFOLD_REG(Y3, Y7)
+	VFOLD_REG(Y4, Y8)
+
+	VMOVDQA ·amd64VMult2(SB), Y0
+	VFOLD_REG(Y5, Y7)
+	VFOLD_REG(Y6, Y8)
+
+	VMOVDQA ·amd64VMult1(SB), Y0
+	VFOLD_REG(Y7, Y8)
+
+	VEXTRACTI128 $1, Y8, X2
+	MOVOA ·amd64Mult1(SB), X0
+	VFOLD128_REG(X8, X2)
+
+	MOVO X2, X1
+	MOVO X1, X2
+	PCLMULQDQ $0x10, X0, X1
+	PSRLDQ $8, X2
+	PXOR X2, X1
+
+	MOVOA ·amd64Barrett(SB), X0
+	MOVO X1, X2
+	PCLMULQDQ $0x00, X0, X2
+	PCLMULQDQ $0x10, X0, X2
+	PXOR X2, X1
+
+	PEXTRD $2, X1, AX
+	VZEROUPPER
+	MOVL AX, ret+32(FP)
+	RET

@@ -11,10 +11,13 @@ state with ARM CRC32 instructions, and uses `EOR3` on CPUs with the SHA3
 extension. That removes the single-stream CRC dependency chain that limits a
 plain CRC-instruction loop.
 
+For `amd64`, the fast path uses x86 carry-less multiply folding. On CPUs with
+`AVX2` and `VPCLMULQDQ`, it folds eight 32-byte vectors at a time. On older
+CPUs with `PCLMULQDQ` and `SSE4.1`, it folds eight 16-byte vectors at a time.
+
 For smaller `arm64` buffers, and for `arm64` CPUs without `PMULL`, the package
-keeps a four-stream CRC32-instruction path. On all other architectures,
-including Intel and AMD `amd64`, it currently falls back to Go's standard
-library implementation.
+keeps a four-stream CRC32-instruction path. Other architectures fall back to
+Go's standard library implementation.
 
 ## Benchmarks
 
@@ -49,3 +52,14 @@ Current Apple M3 result for `BenchmarkChecksumIEEE` after adding the
 That is roughly 5.5x faster than Go's `hash/crc32.ChecksumIEEE` on the same
 machine for these sizes, and it beats the non-CRC hash competitors in the gomap
 tournament on this hardware.
+
+Current Intel i5-11400F result for `BenchmarkChecksumIEEE` after adding the
+`VPCLMULQDQ`/`PCLMULQDQ` paths:
+
+- 64 KiB: about 32 GB/s.
+- 256 KiB: about 32 GB/s.
+- 512 KiB: about 32 GB/s.
+- 1 MiB: about 32-33 GB/s.
+
+That is roughly 1.35x to 1.4x faster than Go's `hash/crc32.ChecksumIEEE` on the
+same machine for these sizes.
