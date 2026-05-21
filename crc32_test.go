@@ -19,6 +19,26 @@ func TestChecksumIEEE(t *testing.T) {
 	}
 }
 
+func TestChecksumIEEEEdges(t *testing.T) {
+	for _, n := range []int{
+		191, 192, 193,
+		575, 576, 577,
+		767, 768, 769,
+		1023, 1024, 1025,
+		64 << 10, 256 << 10, 512 << 10, 1 << 20,
+	} {
+		data := makeInput(n + 15)
+		for offset := 0; offset < 16; offset++ {
+			view := data[offset : offset+n]
+			got := ChecksumIEEE(view)
+			want := crc32.ChecksumIEEE(view)
+			if got != want {
+				t.Fatalf("len=%d offset=%d got=%08x want=%08x", n, offset, got, want)
+			}
+		}
+	}
+}
+
 func TestCombineIEEE(t *testing.T) {
 	for _, split := range []int{0, 1, 2, 3, 7, 8, 31, 64, 1024, 65536} {
 		data := makeInput(split + 12345)
@@ -47,7 +67,7 @@ func BenchmarkChecksumIEEE(b *testing.B) {
 		{name: "1MiB", n: 1 << 20},
 	} {
 		data := makeInput(size.n)
-		b.Run(size.name+"/asm4way", func(b *testing.B) {
+		b.Run(size.name+"/asm", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
 				benchSink ^= ChecksumIEEE(data)

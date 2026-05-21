@@ -5,12 +5,16 @@ Experimental CRC-32/IEEE implementation for Go.
 The package exports `ChecksumIEEE`, which is bit-compatible with
 `hash/crc32.ChecksumIEEE`.
 
-On `arm64`, the experimental path splits large buffers into four adjacent
-chunks, computes four CRC streams with ARM CRC32 instructions, and combines the
-partial CRCs. This targets the same serial-dependency problem that optimized C
-libraries such as `libdeflate` avoid. On ARM64 machines without CRC32 CPU
-support, and on all other architectures including Intel and AMD `amd64`, the
-package falls back to Go's standard library implementation.
+On `arm64`, the fast path follows the same large-buffer shape as `libdeflate`:
+it folds 12 adjacent 16-byte vectors with `PMULL`, reduces the 128-bit folded
+state with ARM CRC32 instructions, and uses `EOR3` on CPUs with the SHA3
+extension. That removes the single-stream CRC dependency chain that limits a
+plain CRC-instruction loop.
+
+For smaller `arm64` buffers, and for `arm64` CPUs without `PMULL`, the package
+keeps a four-stream CRC32-instruction path. On all other architectures,
+including Intel and AMD `amd64`, it currently falls back to Go's standard
+library implementation.
 
 ## Benchmarks
 
@@ -33,3 +37,15 @@ The block sizes are:
 - 256 KiB: middle case.
 - 512 KiB: common one-mark scale for wider rows.
 - 1 MiB: default maximum compression block size.
+
+Current Apple M3 result for `BenchmarkChecksumIEEE` after adding the
+`PMULL`/`EOR3` path:
+
+- 64 KiB: about 57 GB/s.
+- 256 KiB: about 59 GB/s.
+- 512 KiB: about 59 GB/s.
+- 1 MiB: about 59 GB/s.
+
+That is roughly 5.5x faster than Go's `hash/crc32.ChecksumIEEE` on the same
+machine for these sizes, and it beats the non-CRC hash competitors in the gomap
+tournament on this hardware.

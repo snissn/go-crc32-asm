@@ -3,12 +3,28 @@
 package crc32asm
 
 const fourWayThreshold = 16 << 10
+const pmullX12Threshold = 3 * 192
 
 func crc32IEEE4Way(p []byte, chunkLen uintptr) (uint32, uint32, uint32, uint32)
+func crc32IEEEPmullX12(p []byte, blocks uintptr) uint32
+func crc32IEEEPmullX12Eor3(p []byte, blocks uintptr) uint32
 
 func checksumIEEE(data []byte) uint32 {
 	if !hasARM64CRC32() {
 		return checksumIEEEFallback(data)
+	}
+	if hasARM64PMULL() && len(data) >= pmullX12Threshold {
+		prefixLen := len(data) / 192 * 192
+		var crc uint32
+		if hasARM64SHA3() {
+			crc = crc32IEEEPmullX12Eor3(data[:prefixLen], uintptr(prefixLen/192))
+		} else {
+			crc = crc32IEEEPmullX12(data[:prefixLen], uintptr(prefixLen/192))
+		}
+		if prefixLen != len(data) {
+			crc = combineIEEECached(crc, checksumIEEEFallback(data[prefixLen:]), int64(len(data)-prefixLen))
+		}
+		return crc
 	}
 	if len(data) < fourWayThreshold {
 		return checksumIEEEFallback(data)
