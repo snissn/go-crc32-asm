@@ -1,19 +1,166 @@
 package crc32asm
 
 import (
-	"hash/crc32"
+	"encoding/binary"
+	"errors"
+	"hash"
+	stdcrc32 "hash/crc32"
 	"sync"
 )
 
-const ieeePolynomial = 0xedb88320
+// The size of a CRC-32 checksum in bytes.
+const Size = stdcrc32.Size
+
+// Predefined polynomials.
+const (
+	IEEE       = stdcrc32.IEEE
+	Castagnoli = stdcrc32.Castagnoli
+	Koopman    = stdcrc32.Koopman
+)
+
+const ieeePolynomial = IEEE
+
+// Table is a 256-word table representing the polynomial for efficient
+// processing.
+type Table = stdcrc32.Table
+
+// IEEETable is the table for the IEEE polynomial.
+var IEEETable = stdcrc32.IEEETable
+
+var castagnoliTable = stdcrc32.MakeTable(Castagnoli)
+
+// MakeTable returns a Table constructed from the specified polynomial.
+func MakeTable(poly uint32) *Table {
+	switch poly {
+	case IEEE:
+		return IEEETable
+	case Castagnoli:
+		return castagnoliTable
+	default:
+		return stdcrc32.MakeTable(poly)
+	}
+}
 
 // ChecksumIEEE returns the CRC-32 checksum of data using the IEEE polynomial.
 func ChecksumIEEE(data []byte) uint32 {
-	return checksumIEEE(data)
+	return updateIEEE(0, data)
+}
+
+// Checksum returns the CRC-32 checksum of data using the polynomial represented
+// by tab.
+func Checksum(data []byte, tab *Table) uint32 {
+	return Update(0, tab, data)
+}
+
+// Update returns the result of adding the bytes in p to the crc.
+func Update(crc uint32, tab *Table, p []byte) uint32 {
+	switch tab {
+	case IEEETable:
+		return updateIEEE(crc, p)
+	case castagnoliTable:
+		return updateCastagnoli(crc, p)
+	default:
+		return stdcrc32.Update(crc, tab, p)
+	}
+}
+
+// New creates a new hash.Hash32 computing the CRC-32 checksum using the
+// polynomial represented by tab.
+func New(tab *Table) hash.Hash32 {
+	return &digest{tab: tab}
+}
+
+// NewIEEE creates a new hash.Hash32 computing the CRC-32 checksum using the
+// IEEE polynomial.
+func NewIEEE() hash.Hash32 {
+	return New(IEEETable)
+}
+
+type digest struct {
+	crc uint32
+	tab *Table
+}
+
+func (d *digest) Size() int {
+	return Size
+}
+
+func (d *digest) BlockSize() int {
+	return 1
+}
+
+func (d *digest) Reset() {
+	d.crc = 0
+}
+
+func (d *digest) Write(p []byte) (int, error) {
+	d.crc = Update(d.crc, d.tab, p)
+	return len(p), nil
+}
+
+func (d *digest) Sum32() uint32 {
+	return d.crc
+}
+
+func (d *digest) Sum(in []byte) []byte {
+	s := d.Sum32()
+	return append(in, byte(s>>24), byte(s>>16), byte(s>>8), byte(s))
+}
+
+func (d *digest) AppendBinary(b []byte) ([]byte, error) {
+	b = append(b, "crc\x01"...)
+	b = binary.BigEndian.AppendUint32(b, tableSum(d.tab))
+	b = binary.BigEndian.AppendUint32(b, d.crc)
+	return b, nil
+}
+
+func (d *digest) MarshalBinary() ([]byte, error) {
+	return d.AppendBinary(make([]byte, 0, len("crc\x01")+4+4))
+}
+
+func (d *digest) UnmarshalBinary(b []byte) error {
+	if len(b) < len("crc\x01") || string(b[:len("crc\x01")]) != "crc\x01" {
+		return errors.New("hash/crc32: invalid hash state identifier")
+	}
+	if len(b) != len("crc\x01")+4+4 {
+		return errors.New("hash/crc32: invalid hash state size")
+	}
+	if tableSum(d.tab) != binary.BigEndian.Uint32(b[4:8]) {
+		return errors.New("hash/crc32: tables do not match")
+	}
+	d.crc = binary.BigEndian.Uint32(b[8:12])
+	return nil
+}
+
+func (d *digest) Clone() (hash.Cloner, error) {
+	clone := *d
+	return &clone, nil
+}
+
+func tableSum(t *Table) uint32 {
+	var a [1024]byte
+	b := a[:0]
+	if t != nil {
+		for _, x := range t {
+			b = binary.BigEndian.AppendUint32(b, x)
+		}
+	}
+	return ChecksumIEEE(b)
 }
 
 func checksumIEEEFallback(data []byte) uint32 {
-	return crc32.ChecksumIEEE(data)
+	return stdcrc32.ChecksumIEEE(data)
+}
+
+func updateIEEE(crc uint32, p []byte) uint32 {
+	if crc == 0 {
+		return checksumIEEE(p)
+	}
+	return combineIEEECached(crc, checksumIEEE(p), int64(len(p)))
+}
+
+func updateCastagnoli(crc uint32, p []byte) uint32 {
+	return stdcrc32.Update(crc, castagnoliTable, p)
 }
 
 var zeroAppendOps sync.Map

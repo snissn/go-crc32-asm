@@ -2,6 +2,8 @@ package crc32asm
 
 import (
 	"bytes"
+	"encoding"
+	"hash"
 	"hash/crc32"
 	"testing"
 )
@@ -16,6 +18,146 @@ func TestChecksumIEEE(t *testing.T) {
 		if got != want {
 			t.Fatalf("len=%d got=%08x want=%08x", n, got, want)
 		}
+	}
+}
+
+func TestStdlibCompatibleConstantsAndTables(t *testing.T) {
+	if Size != crc32.Size {
+		t.Fatalf("Size=%d want %d", Size, crc32.Size)
+	}
+	if IEEE != crc32.IEEE {
+		t.Fatalf("IEEE=%08x want %08x", IEEE, crc32.IEEE)
+	}
+	if Castagnoli != crc32.Castagnoli {
+		t.Fatalf("Castagnoli=%08x want %08x", Castagnoli, crc32.Castagnoli)
+	}
+	if Koopman != crc32.Koopman {
+		t.Fatalf("Koopman=%08x want %08x", Koopman, crc32.Koopman)
+	}
+	if IEEETable != MakeTable(IEEE) {
+		t.Fatalf("MakeTable(IEEE) did not return IEEETable")
+	}
+}
+
+func TestStdlibCompatibleChecksumAndUpdate(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		poly    uint32
+		stdTab  *crc32.Table
+		fastTab *Table
+	}{
+		{name: "IEEE", poly: crc32.IEEE, stdTab: crc32.MakeTable(crc32.IEEE), fastTab: MakeTable(IEEE)},
+		{name: "Castagnoli", poly: crc32.Castagnoli, stdTab: crc32.MakeTable(crc32.Castagnoli), fastTab: MakeTable(Castagnoli)},
+		{name: "Koopman", poly: crc32.Koopman, stdTab: crc32.MakeTable(crc32.Koopman), fastTab: MakeTable(Koopman)},
+		{name: "Custom", poly: 0xd5828281, stdTab: crc32.MakeTable(0xd5828281), fastTab: MakeTable(0xd5828281)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for n := 0; n <= 1<<20; n = nextSize(n) {
+				data := makeInput(n)
+				got := Checksum(data, tc.fastTab)
+				want := crc32.Checksum(data, tc.stdTab)
+				if got != want {
+					t.Fatalf("Checksum len=%d got=%08x want=%08x", n, got, want)
+				}
+
+				for _, split := range []int{0, 1, 2, 3, 7, 8, 31, 64, 1024, 65536} {
+					if split > len(data) {
+						continue
+					}
+					got = Update(Update(0, tc.fastTab, data[:split]), tc.fastTab, data[split:])
+					want = crc32.Update(crc32.Update(0, tc.stdTab, data[:split]), tc.stdTab, data[split:])
+					if got != want {
+						t.Fatalf("Update len=%d split=%d got=%08x want=%08x", n, split, got, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestStdlibCompatibleHash32(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		stdHash hash.Hash32
+		fast    hash.Hash32
+	}{
+		{name: "IEEE", stdHash: crc32.NewIEEE(), fast: NewIEEE()},
+		{name: "Castagnoli", stdHash: crc32.New(crc32.MakeTable(crc32.Castagnoli)), fast: New(MakeTable(Castagnoli))},
+		{name: "Koopman", stdHash: crc32.New(crc32.MakeTable(crc32.Koopman)), fast: New(MakeTable(Koopman))},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := makeInput(1<<20 + 333)
+			for _, chunkLen := range []int{1, 3, 7, 64, 4096, 65536} {
+				tc.stdHash.Reset()
+				tc.fast.Reset()
+				for off := 0; off < len(data); {
+					end := off + chunkLen
+					if end > len(data) {
+						end = len(data)
+					}
+					if n, err := tc.stdHash.Write(data[off:end]); n != end-off || err != nil {
+						t.Fatalf("stdlib Write n=%d err=%v", n, err)
+					}
+					if n, err := tc.fast.Write(data[off:end]); n != end-off || err != nil {
+						t.Fatalf("fast Write n=%d err=%v", n, err)
+					}
+					off = end
+				}
+				if got, want := tc.fast.Sum32(), tc.stdHash.Sum32(); got != want {
+					t.Fatalf("chunkLen=%d Sum32 got=%08x want=%08x", chunkLen, got, want)
+				}
+				if got, want := tc.fast.Sum([]byte("prefix")), tc.stdHash.Sum([]byte("prefix")); !bytes.Equal(got, want) {
+					t.Fatalf("chunkLen=%d Sum got=%x want=%x", chunkLen, got, want)
+				}
+				if tc.fast.Size() != tc.stdHash.Size() {
+					t.Fatalf("Size=%d want %d", tc.fast.Size(), tc.stdHash.Size())
+				}
+				if tc.fast.BlockSize() != tc.stdHash.BlockSize() {
+					t.Fatalf("BlockSize=%d want %d", tc.fast.BlockSize(), tc.stdHash.BlockSize())
+				}
+			}
+		})
+	}
+}
+
+func TestStdlibCompatibleHashBinaryState(t *testing.T) {
+	data := makeInput(65536)
+	fast := NewIEEE()
+	std := crc32.NewIEEE()
+	_, _ = fast.Write(data[:12345])
+	_, _ = std.Write(data[:12345])
+
+	fastMarshaler := fast.(encoding.BinaryMarshaler)
+	stdMarshaler := std.(encoding.BinaryMarshaler)
+	fastState, err := fastMarshaler.MarshalBinary()
+	if err != nil {
+		t.Fatalf("fast MarshalBinary: %v", err)
+	}
+	stdState, err := stdMarshaler.MarshalBinary()
+	if err != nil {
+		t.Fatalf("stdlib MarshalBinary: %v", err)
+	}
+	if !bytes.Equal(fastState, stdState) {
+		t.Fatalf("MarshalBinary mismatch got=%x want=%x", fastState, stdState)
+	}
+
+	restored := NewIEEE()
+	if err := restored.(encoding.BinaryUnmarshaler).UnmarshalBinary(fastState); err != nil {
+		t.Fatalf("UnmarshalBinary: %v", err)
+	}
+	_, _ = restored.Write(data[12345:])
+	if got, want := restored.Sum32(), crc32.ChecksumIEEE(data); got != want {
+		t.Fatalf("restored Sum32 got=%08x want=%08x", got, want)
+	}
+
+	cloned, err := fast.(hash.Cloner).Clone()
+	if err != nil {
+		t.Fatalf("Clone: %v", err)
+	}
+	cloneHash := cloned.(hash.Hash32)
+	_, _ = cloneHash.Write(data[12345:])
+	if got, want := cloneHash.Sum32(), crc32.ChecksumIEEE(data); got != want {
+		t.Fatalf("cloned Sum32 got=%08x want=%08x", got, want)
 	}
 }
 

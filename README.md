@@ -17,6 +17,10 @@ func checksum(block []byte) uint32 {
 }
 ```
 
+The package also exposes the standard `hash/crc32` API shape: `MakeTable`,
+`Checksum`, `Update`, `New`, and `NewIEEE`. Canonical CRC-32/IEEE calls use the
+fast path; other polynomials remain compatible with Go stdlib behavior.
+
 ## Implementation
 
 On `arm64`, the large-buffer path follows the same high-level shape as
