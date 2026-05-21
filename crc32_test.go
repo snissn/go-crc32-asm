@@ -108,6 +108,53 @@ func TestStdlibCompatibleChecksumAndUpdate(t *testing.T) {
 	}
 }
 
+func TestUpdateNonZeroSeeds(t *testing.T) {
+	prefix := makeInput(4096)
+	for _, tc := range []struct {
+		name    string
+		stdTab  *crc32.Table
+		fastTab *Table
+		seeds   []uint32
+	}{
+		{
+			name:    "IEEE",
+			stdTab:  crc32.IEEETable,
+			fastTab: IEEETable,
+			seeds:   []uint32{1, 0x12345678, 0xffffffff, crc32.ChecksumIEEE(prefix)},
+		},
+		{
+			name:    "Castagnoli",
+			stdTab:  crc32.MakeTable(crc32.Castagnoli),
+			fastTab: MakeTable(Castagnoli),
+			seeds:   []uint32{1, 0x12345678, 0xffffffff, crc32.Checksum(prefix, crc32.MakeTable(crc32.Castagnoli))},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, n := range []int{
+				0, 1,
+				63, 64, 65,
+				127, 128, 129,
+				191, 192, 193,
+				255, 256, 257,
+				511, 512, 513,
+				575, 576, 577,
+				1023, 1024, 1025,
+				(16 << 10) - 1, 16 << 10, (16 << 10) + 1,
+				64 << 10, 256 << 10, 512 << 10, 1 << 20,
+			} {
+				data := makeInput(n)
+				for _, seed := range tc.seeds {
+					got := Update(seed, tc.fastTab, data)
+					want := crc32.Update(seed, tc.stdTab, data)
+					if got != want {
+						t.Fatalf("len=%d seed=%08x got=%08x want=%08x", n, seed, got, want)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestStdlibCompatibleHash32(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -269,7 +316,7 @@ func BenchmarkChecksumIEEE(b *testing.B) {
 
 func BenchmarkChecksumCastagnoli(b *testing.B) {
 	stdTab := crc32.MakeTable(crc32.Castagnoli)
-	asmTab := MakeTable(Castagnoli)
+	pkgTab := MakeTable(Castagnoli)
 	for _, size := range []struct {
 		name string
 		n    int
@@ -280,16 +327,16 @@ func BenchmarkChecksumCastagnoli(b *testing.B) {
 		{name: "1MiB", n: 1 << 20},
 	} {
 		data := makeInput(size.n)
-		b.Run(size.name+"/asm_direct", func(b *testing.B) {
+		b.Run(size.name+"/package_direct", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
 				benchSink ^= ChecksumCastagnoli(data)
 			}
 		})
-		b.Run(size.name+"/asm_table", func(b *testing.B) {
+		b.Run(size.name+"/package_table", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
-				benchSink ^= Checksum(data, asmTab)
+				benchSink ^= Checksum(data, pkgTab)
 			}
 		})
 		b.Run(size.name+"/stdlib", func(b *testing.B) {
@@ -303,7 +350,7 @@ func BenchmarkChecksumCastagnoli(b *testing.B) {
 
 func BenchmarkUpdateNonZero(b *testing.B) {
 	stdCastagnoliTab := crc32.MakeTable(crc32.Castagnoli)
-	asmCastagnoliTab := MakeTable(Castagnoli)
+	pkgCastagnoliTab := MakeTable(Castagnoli)
 	prefix := makeInput(4096)
 	ieeeSeed := crc32.ChecksumIEEE(prefix)
 	castagnoliSeed := crc32.Checksum(prefix, stdCastagnoliTab)
@@ -320,7 +367,7 @@ func BenchmarkUpdateNonZero(b *testing.B) {
 		{name: "1MiB", n: 1 << 20},
 	} {
 		data := makeInput(size.n)
-		b.Run(size.name+"/IEEE/asm", func(b *testing.B) {
+		b.Run(size.name+"/IEEE/package", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
 				benchSink ^= Update(ieeeSeed, IEEETable, data)
@@ -332,10 +379,10 @@ func BenchmarkUpdateNonZero(b *testing.B) {
 				benchSink ^= crc32.Update(ieeeSeed, crc32.IEEETable, data)
 			}
 		})
-		b.Run(size.name+"/Castagnoli/asm", func(b *testing.B) {
+		b.Run(size.name+"/Castagnoli/package", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
-				benchSink ^= Update(castagnoliSeed, asmCastagnoliTab, data)
+				benchSink ^= Update(castagnoliSeed, pkgCastagnoliTab, data)
 			}
 		})
 		b.Run(size.name+"/Castagnoli/stdlib", func(b *testing.B) {
