@@ -151,7 +151,7 @@ func updateIEEE(crc uint32, p []byte) uint32 {
 	if crc == 0 {
 		return checksumIEEE(p)
 	}
-	return combineIEEECached(crc, checksumIEEE(p), int64(len(p)))
+	return stdcrc32.Update(crc, IEEETable, p)
 }
 
 func updateCastagnoli(crc uint32, p []byte) uint32 {
