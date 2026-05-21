@@ -17,9 +17,16 @@ func checksum(block []byte) uint32 {
 }
 ```
 
-The package also exposes the standard `hash/crc32` API shape: `MakeTable`,
-`Checksum`, `Update`, `New`, and `NewIEEE`. Canonical CRC-32/IEEE calls use the
-fast path; other polynomials remain compatible with Go stdlib behavior.
+The package also mirrors the standard `hash/crc32` API shape:
+
+- Constants: `Size`, `IEEE`, `Castagnoli`, and `Koopman`.
+- Table API: `Table`, `IEEETable`, and `MakeTable`.
+- Checksum API: `Checksum`, `ChecksumIEEE`, and `Update`.
+- Streaming API: `New` and `NewIEEE` return `hash.Hash32` values with standard
+  `Write`, `Sum32`, `Sum`, `Reset`, `Size`, and `BlockSize` behavior.
+
+Canonical CRC-32/IEEE calls use the fast path; other polynomials remain
+compatible with Go stdlib behavior.
 
 ## Implementation
 

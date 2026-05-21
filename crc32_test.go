@@ -10,6 +10,24 @@ import (
 
 var benchSink uint32
 
+func requireBinaryMarshaler(t *testing.T, name string, h hash.Hash32) encoding.BinaryMarshaler {
+	t.Helper()
+	marshaler, ok := h.(encoding.BinaryMarshaler)
+	if !ok {
+		t.Fatalf("%s hash does not implement encoding.BinaryMarshaler", name)
+	}
+	return marshaler
+}
+
+func requireBinaryUnmarshaler(t *testing.T, name string, h hash.Hash32) encoding.BinaryUnmarshaler {
+	t.Helper()
+	unmarshaler, ok := h.(encoding.BinaryUnmarshaler)
+	if !ok {
+		t.Fatalf("%s hash does not implement encoding.BinaryUnmarshaler", name)
+	}
+	return unmarshaler
+}
+
 func TestChecksumIEEE(t *testing.T) {
 	for n := 0; n <= 1<<20; n = nextSize(n) {
 		data := makeInput(n)
@@ -142,8 +160,8 @@ func TestStdlibCompatibleHashBinaryState(t *testing.T) {
 	_, _ = fast.Write(data[:12345])
 	_, _ = std.Write(data[:12345])
 
-	fastMarshaler := fast.(encoding.BinaryMarshaler)
-	stdMarshaler := std.(encoding.BinaryMarshaler)
+	fastMarshaler := requireBinaryMarshaler(t, "fast", fast)
+	stdMarshaler := requireBinaryMarshaler(t, "stdlib", std)
 	fastState, err := fastMarshaler.MarshalBinary()
 	if err != nil {
 		t.Fatalf("fast MarshalBinary: %v", err)
@@ -157,7 +175,7 @@ func TestStdlibCompatibleHashBinaryState(t *testing.T) {
 	}
 
 	restored := NewIEEE()
-	if err := restored.(encoding.BinaryUnmarshaler).UnmarshalBinary(fastState); err != nil {
+	if err := requireBinaryUnmarshaler(t, "restored", restored).UnmarshalBinary(fastState); err != nil {
 		t.Fatalf("UnmarshalBinary: %v", err)
 	}
 	_, _ = restored.Write(data[12345:])
