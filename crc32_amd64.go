@@ -38,3 +38,7 @@ func checksumIEEE(data []byte) uint32 {
 	}
 	return crc
 }
+
+func checksumCastagnoli(data []byte) uint32 {
+	return checksumCastagnoliFallback(data)
+}

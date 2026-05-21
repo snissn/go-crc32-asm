@@ -21,6 +21,18 @@ func TestChecksumIEEE(t *testing.T) {
 	}
 }
 
+func TestChecksumCastagnoli(t *testing.T) {
+	tab := crc32.MakeTable(crc32.Castagnoli)
+	for n := 0; n <= 1<<20; n = nextSize(n) {
+		data := makeInput(n)
+		got := ChecksumCastagnoli(data)
+		want := crc32.Checksum(data, tab)
+		if got != want {
+			t.Fatalf("len=%d got=%08x want=%08x", n, got, want)
+		}
+	}
+}
+
 func TestStdlibCompatibleConstantsAndTables(t *testing.T) {
 	if Size != crc32.Size {
 		t.Fatalf("Size=%d want %d", Size, crc32.Size)
@@ -36,6 +48,9 @@ func TestStdlibCompatibleConstantsAndTables(t *testing.T) {
 	}
 	if IEEETable != MakeTable(IEEE) {
 		t.Fatalf("MakeTable(IEEE) did not return IEEETable")
+	}
+	if MakeTable(Castagnoli) != crc32.MakeTable(crc32.Castagnoli) {
+		t.Fatalf("MakeTable(Castagnoli) did not match stdlib Castagnoli table")
 	}
 }
 
@@ -198,6 +213,24 @@ func TestCombineIEEE(t *testing.T) {
 	}
 }
 
+func TestCombineCastagnoli(t *testing.T) {
+	tab := crc32.MakeTable(crc32.Castagnoli)
+	for _, split := range []int{0, 1, 2, 3, 7, 8, 31, 64, 1024, 65536} {
+		data := makeInput(split + 12345)
+		left := crc32.Checksum(data[:split], tab)
+		right := crc32.Checksum(data[split:], tab)
+		got := combineCRC(Castagnoli, left, right, int64(len(data)-split))
+		want := crc32.Checksum(data, tab)
+		if got != want {
+			t.Fatalf("split=%d got=%08x want=%08x", split, got, want)
+		}
+		got = combineCastagnoliCached(left, right, int64(len(data)-split))
+		if got != want {
+			t.Fatalf("cached split=%d got=%08x want=%08x", split, got, want)
+		}
+	}
+}
+
 func BenchmarkChecksumIEEE(b *testing.B) {
 	for _, size := range []struct {
 		name string
@@ -219,6 +252,40 @@ func BenchmarkChecksumIEEE(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
 				benchSink ^= crc32.ChecksumIEEE(data)
+			}
+		})
+	}
+}
+
+func BenchmarkChecksumCastagnoli(b *testing.B) {
+	stdTab := crc32.MakeTable(crc32.Castagnoli)
+	asmTab := MakeTable(Castagnoli)
+	for _, size := range []struct {
+		name string
+		n    int
+	}{
+		{name: "64KiB", n: 64 << 10},
+		{name: "256KiB", n: 256 << 10},
+		{name: "512KiB", n: 512 << 10},
+		{name: "1MiB", n: 1 << 20},
+	} {
+		data := makeInput(size.n)
+		b.Run(size.name+"/asm_direct", func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				benchSink ^= ChecksumCastagnoli(data)
+			}
+		})
+		b.Run(size.name+"/asm_table", func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				benchSink ^= Checksum(data, asmTab)
+			}
+		})
+		b.Run(size.name+"/stdlib", func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				benchSink ^= crc32.Checksum(data, stdTab)
 			}
 		})
 	}

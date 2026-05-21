@@ -102,6 +102,79 @@ done:
 	MOVW	R10, ret3+44(FP)
 	RET
 
+// func crc32Castagnoli4Way(p []byte, chunkLen uintptr) (uint32, uint32, uint32, uint32)
+TEXT ·crc32Castagnoli4Way(SB),NOSPLIT,$0-48
+	MOVD	p_base+0(FP), R0
+	MOVD	chunkLen+24(FP), R1
+
+	MOVD	R0, R3
+	ADD	R1, R0, R4
+	ADD	R1, R4, R5
+	ADD	R1, R5, R6
+
+	MOVD	$-1, R7
+	MOVD	$-1, R8
+	MOVD	$-1, R9
+	MOVD	$-1, R10
+
+castagnoli_loop8:
+	CMP	$8, R1
+	BLT	castagnoli_tail4
+	MOVD.P	8(R3), R11
+	MOVD.P	8(R4), R12
+	MOVD.P	8(R5), R13
+	MOVD.P	8(R6), R14
+	CRC32CX	R11, R7
+	CRC32CX	R12, R8
+	CRC32CX	R13, R9
+	CRC32CX	R14, R10
+	SUB	$8, R1
+	JMP	castagnoli_loop8
+
+castagnoli_tail4:
+	TBZ	$2, R1, castagnoli_tail2
+	MOVWU.P	4(R3), R11
+	MOVWU.P	4(R4), R12
+	MOVWU.P	4(R5), R13
+	MOVWU.P	4(R6), R14
+	CRC32CW	R11, R7
+	CRC32CW	R12, R8
+	CRC32CW	R13, R9
+	CRC32CW	R14, R10
+
+castagnoli_tail2:
+	TBZ	$1, R1, castagnoli_tail1
+	MOVHU.P	2(R3), R11
+	MOVHU.P	2(R4), R12
+	MOVHU.P	2(R5), R13
+	MOVHU.P	2(R6), R14
+	CRC32CH	R11, R7
+	CRC32CH	R12, R8
+	CRC32CH	R13, R9
+	CRC32CH	R14, R10
+
+castagnoli_tail1:
+	TBZ	$0, R1, castagnoli_done
+	MOVBU	(R3), R11
+	MOVBU	(R4), R12
+	MOVBU	(R5), R13
+	MOVBU	(R6), R14
+	CRC32CB	R11, R7
+	CRC32CB	R12, R8
+	CRC32CB	R13, R9
+	CRC32CB	R14, R10
+
+castagnoli_done:
+	MVNW	R7, R7
+	MVNW	R8, R8
+	MVNW	R9, R9
+	MVNW	R10, R10
+	MOVW	R7, ret+32(FP)
+	MOVW	R8, ret1+36(FP)
+	MOVW	R9, ret2+40(FP)
+	MOVW	R10, ret3+44(FP)
+	RET
+
 // func crc32IEEEPmullX12(p []byte, blocks uintptr) uint32
 TEXT ·crc32IEEEPmullX12(SB),NOSPLIT,$0-32
 	MOVD	p_base+0(FP), R0

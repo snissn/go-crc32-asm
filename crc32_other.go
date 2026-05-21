@@ -5,3 +5,7 @@ package crc32asm
 func checksumIEEE(data []byte) uint32 {
 	return checksumIEEEFallback(data)
 }
+
+func checksumCastagnoli(data []byte) uint32 {
+	return checksumCastagnoliFallback(data)
+}
