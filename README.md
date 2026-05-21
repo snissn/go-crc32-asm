@@ -12,8 +12,11 @@ extension. That removes the single-stream CRC dependency chain that limits a
 plain CRC-instruction loop.
 
 For `amd64`, the fast path uses x86 carry-less multiply folding. On CPUs with
-`AVX2` and `VPCLMULQDQ`, it folds eight 32-byte vectors at a time. On older
-CPUs with `PCLMULQDQ` and `SSE4.1`, it folds eight 16-byte vectors at a time.
+`AVX512F`, `AVX512BW`, `AVX512VL`, and `VPCLMULQDQ`, it folds eight 64-byte
+vectors at a time and uses `VPTERNLOGD` for the three-way XOR in the fold. On
+CPUs with `AVX2` and `VPCLMULQDQ`, it folds eight 32-byte vectors at a time.
+On older CPUs with `PCLMULQDQ` and `SSE4.1`, it folds eight 16-byte vectors at
+a time.
 
 For smaller `arm64` buffers, and for `arm64` CPUs without `PMULL`, the package
 keeps a four-stream CRC32-instruction path. Other architectures fall back to
@@ -54,12 +57,14 @@ machine for these sizes, and it beats the non-CRC hash competitors in the gomap
 tournament on this hardware.
 
 Current Intel i5-11400F result for `BenchmarkChecksumIEEE` after adding the
-`VPCLMULQDQ`/`PCLMULQDQ` paths:
+`AVX512` `VPCLMULQDQ` path:
 
-- 64 KiB: about 32 GB/s.
-- 256 KiB: about 32 GB/s.
-- 512 KiB: about 32 GB/s.
-- 1 MiB: about 32-33 GB/s.
+- 64 KiB: about 63-64 GB/s.
+- 256 KiB: about 63-65 GB/s.
+- 512 KiB: about 58-62 GB/s.
+- 1 MiB: about 49-61 GB/s in a noisy run.
 
-That is roughly 1.35x to 1.4x faster than Go's `hash/crc32.ChecksumIEEE` on the
-same machine for these sizes.
+That is roughly 2.5x to 2.75x faster than Go's `hash/crc32.ChecksumIEEE` on
+the same machine for these sizes. It is also in the same performance class as a
+local `libdeflate_crc32` C benchmark on the same host, which measured about
+62-64 GB/s across these block sizes.
