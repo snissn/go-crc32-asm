@@ -1,94 +1,100 @@
 # go-crc32-asm
 
-Experimental CRC-32/IEEE implementation for Go.
+Fast CRC-32/IEEE checksums for Go.
 
-The package exports `ChecksumIEEE`, which is bit-compatible with
-`hash/crc32.ChecksumIEEE`.
+`ChecksumIEEE` is bit-compatible with Go's `hash/crc32.ChecksumIEEE`, but uses
+wide folding paths for large buffers. The target workload is storage-engine
+checksums over pages, granules, compressed blocks, and similar contiguous byte
+ranges.
 
-On `arm64`, the fast path follows the same large-buffer shape as `libdeflate`:
-it folds 12 adjacent 16-byte vectors with `PMULL`, reduces the 128-bit folded
-state with ARM CRC32 instructions, and uses `EOR3` on CPUs with the SHA3
-extension. That removes the single-stream CRC dependency chain that limits a
-plain CRC-instruction loop.
+```go
+package main
 
-For `amd64`, the fast path uses x86 carry-less multiply folding. On CPUs with
-`AVX512F`, `AVX512BW`, `AVX512VL`, and `VPCLMULQDQ`, it folds eight 64-byte
-vectors at a time and uses `VPTERNLOGD` for the three-way XOR in the fold. On
-CPUs with `AVX2` and `VPCLMULQDQ`, it folds eight 32-byte vectors at a time.
-On older CPUs with `PCLMULQDQ` and `SSE4.1`, it folds eight 16-byte vectors at
-a time.
+import crc32asm "github.com/snissn/go-crc32-asm"
 
-For smaller `arm64` buffers, and for `arm64` CPUs without `PMULL`, the package
-keeps a four-stream CRC32-instruction path. Other architectures fall back to
-Go's standard library implementation.
+func checksum(block []byte) uint32 {
+	return crc32asm.ChecksumIEEE(block)
+}
+```
+
+## Implementation
+
+On `arm64`, the large-buffer path follows the same high-level shape as
+`libdeflate`: fold 12 adjacent 16-byte vectors with `PMULL`, reduce the folded
+state with ARM CRC32 instructions, and use `EOR3` on CPUs with the SHA3
+extension.
+
+On `amd64`, the fast path uses carry-less multiply folding:
+
+- `AVX512F` + `AVX512BW` + `AVX512VL` + `VPCLMULQDQ`: eight 64-byte lanes with
+  `VPTERNLOGD`.
+- `AVX2` + `VPCLMULQDQ`: eight 32-byte lanes.
+- `PCLMULQDQ` + `SSE4.1`: eight 16-byte lanes.
+
+Other architectures fall back to Go's standard library implementation.
 
 ## Benchmarks
 
-The focused CRC benchmark compares this package against Go stdlib:
+Run the focused CRC benchmark:
 
 ```sh
 go test -run '^$' -bench BenchmarkChecksumIEEE -benchtime=1s -count=3
 ```
 
-`BenchmarkGomapHashTournamentSlice` reuses the gomap hash tournament block
-sizes and a small competitor set, including Go stdlib CRC-32/IEEE, Go stdlib
-CRC-32C/Castagnoli, `github.com/klauspost/crc32`, `FarmHash64`, and `XXH3_64`:
+Run the broader hash tournament:
 
 ```sh
 go test -run '^$' -bench BenchmarkGomapHashTournamentSlice -benchtime=1s -count=3
 ```
 
-The block sizes are:
+The tournament uses storage-oriented block sizes:
 
-- 64 KiB: default lower compression-block threshold.
-- 256 KiB: middle case.
-- 512 KiB: common one-mark scale for wider rows.
-- 1 MiB: default maximum compression block size.
+- 64 KiB
+- 256 KiB
+- 512 KiB
+- 1 MiB
 
-Current Apple M3 result for `BenchmarkChecksumIEEE` after adding the
-`PMULL`/`EOR3` path:
+Current local results:
 
-- 64 KiB: about 57 GB/s.
-- 256 KiB: about 59 GB/s.
-- 512 KiB: about 59 GB/s.
-- 1 MiB: about 59 GB/s.
+| Machine | Size | `go-crc32-asm` | Go stdlib `ChecksumIEEE` |
+|---|---:|---:|---:|
+| Apple M3 | 64 KiB | ~57 GB/s | ~10.5 GB/s |
+| Apple M3 | 256 KiB | ~59 GB/s | ~10 GB/s |
+| Apple M3 | 512 KiB | ~59 GB/s | ~10.5 GB/s |
+| Apple M3 | 1 MiB | ~59 GB/s | ~10 GB/s |
+| Intel i5-11400F | 64 KiB | ~63-64 GB/s | ~24 GB/s |
+| Intel i5-11400F | 256 KiB | ~63-65 GB/s | ~23 GB/s |
+| Intel i5-11400F | 512 KiB | ~58-62 GB/s | ~23 GB/s |
+| Intel i5-11400F | 1 MiB | ~54-62 GB/s | ~23 GB/s |
 
-That is roughly 5.5x faster than Go's `hash/crc32.ChecksumIEEE` on the same
-machine for these sizes, and it beats the non-CRC hash competitors in the gomap
-tournament on this hardware.
-
-Current Intel i5-11400F result for `BenchmarkChecksumIEEE` after adding the
-`AVX512` `VPCLMULQDQ` path:
-
-- 64 KiB: about 63-64 GB/s.
-- 256 KiB: about 63-65 GB/s.
-- 512 KiB: about 58-62 GB/s.
-- 1 MiB: about 49-61 GB/s in a noisy run.
-
-That is roughly 2.5x to 2.75x faster than Go's `hash/crc32.ChecksumIEEE` on
-the same machine for these sizes. It is also in the same performance class as a
-local `libdeflate_crc32` C benchmark on the same host, which measured about
+On the same Intel host, a local `libdeflate_crc32` C benchmark measured about
 62-64 GB/s across these block sizes.
 
-`github.com/klauspost/crc32` comparison:
+## Tournament Notes
 
-- On Apple M3, `github.com/klauspost/crc32` does not have the `arm64`
-  `PMULL`/`EOR3` path used here. In `BenchmarkGomapHashTournamentSlice`, it
-  measured about 2.6-2.7 GB/s for both CRC-32/IEEE and CRC-32C/Castagnoli,
-  while this package measured about 57-59 GB/s for CRC-32/IEEE.
-- On Intel i5-11400F, `github.com/klauspost/crc32` measured about 23-24 GB/s
-  for CRC-32/IEEE and about 29-30 GB/s for CRC-32C/Castagnoli at the gomap
-  tournament block sizes. This package measured about 60-64 GB/s for
-  CRC-32/IEEE on the same run.
+`BenchmarkGomapHashTournamentSlice` also includes Go stdlib CRC-32C/Castagnoli,
+`github.com/klauspost/crc32`, `FarmHash64`, and `XXH3_64`.
 
-CRC naming note:
+Representative results from the current runs:
 
-- CRC-32/IEEE is the classic Ethernet/gzip/zip/png polynomial. It is the value
-  returned by Go's `hash/crc32.ChecksumIEEE`, and it is what this package
-  implements.
-- CRC-32C/Castagnoli is a different 32-bit CRC polynomial. It returns a
-  different checksum for the same bytes. It is often fast on x86 because the
-  SSE4.2 `CRC32` instruction computes the Castagnoli polynomial directly.
-- The two are not drop-in compatible on disk unless the stored checksum format
-  is allowed to change. Both produce 32-bit CRCs, but the polynomial and output
-  values differ.
+| Machine | Competitor | Throughput |
+|---|---|---:|
+| Apple M3 | `go-crc32-asm` CRC-32/IEEE | ~57-59 GB/s |
+| Apple M3 | `XXH3_64` | ~31 GB/s |
+| Apple M3 | `FarmHash64` | ~26-27 GB/s |
+| Apple M3 | Go stdlib CRC-32/IEEE or CRC-32C | ~10 GB/s |
+| Intel i5-11400F | `go-crc32-asm` CRC-32/IEEE | ~60-64 GB/s |
+| Intel i5-11400F | `XXH3_64` | ~60-79 GB/s |
+| Intel i5-11400F | Go stdlib CRC-32C/Castagnoli | ~29-30 GB/s |
+| Intel i5-11400F | `github.com/klauspost/crc32` CRC-32C/Castagnoli | ~29-30 GB/s |
+| Intel i5-11400F | Go stdlib CRC-32/IEEE | ~23-24 GB/s |
+| Intel i5-11400F | `github.com/klauspost/crc32` CRC-32/IEEE | ~23-24 GB/s |
+
+## Checksum Compatibility
+
+This package implements CRC-32/IEEE, the same polynomial and output format as
+`hash/crc32.ChecksumIEEE`.
+
+CRC-32C/Castagnoli is a different 32-bit CRC polynomial. It returns different
+checksums for the same bytes and is not disk-format compatible with CRC-32/IEEE
+unless the stored checksum format is allowed to change.
