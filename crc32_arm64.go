@@ -68,7 +68,7 @@ func checksumCastagnoli(data []byte) uint32 {
 	crc = combineCastagnoliCached(crc, c2, int64(chunkLen))
 	crc = combineCastagnoliCached(crc, c3, int64(chunkLen))
 	if covered != len(data) {
-		crc = combineCRC(castagnoliPolynomial, crc, checksumCastagnoliFallback(data[covered:]), int64(len(data)-covered))
+		crc = combineCastagnoliCached(crc, checksumCastagnoliFallback(data[covered:]), int64(len(data)-covered))
 	}
 	return crc
 }
