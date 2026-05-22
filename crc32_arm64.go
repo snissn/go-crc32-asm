@@ -10,6 +10,8 @@ func crc32IEEE4Way(p []byte, chunkLen uintptr) (uint32, uint32, uint32, uint32)
 func crc32Castagnoli4Way(p []byte, chunkLen uintptr) (uint32, uint32, uint32, uint32)
 func crc32IEEEPmullX12(p []byte, blocks uintptr) uint32
 func crc32IEEEPmullX12Eor3(p []byte, blocks uintptr) uint32
+func crc32CastagnoliPmullX12(p []byte, blocks uintptr) uint32
+func crc32CastagnoliPmullX12Eor3(p []byte, blocks uintptr) uint32
 
 func useIEEEFallback(crc uint32, n int) bool {
 	if !hasARM64CRC32() {
@@ -23,7 +25,13 @@ func useIEEEFallback(crc uint32, n int) bool {
 }
 
 func useCastagnoliFallback(crc uint32, n int) bool {
-	return !hasARM64CRC32() || n < castagnoliFourWayThreshold
+	if !hasARM64CRC32() {
+		return true
+	}
+	if hasARM64PMULL() {
+		return n < pmullX12Threshold
+	}
+	return n < castagnoliFourWayThreshold
 }
 
 func checksumIEEE(data []byte) uint32 {
@@ -68,6 +76,19 @@ func checksumCastagnoli(data []byte) uint32 {
 	if !hasARM64CRC32() {
 		return checksumCastagnoliFallback(data)
 	}
+	if hasARM64PMULL() && len(data) >= pmullX12Threshold {
+		prefixLen := len(data) / 192 * 192
+		var crc uint32
+		if hasARM64SHA3() {
+			crc = crc32CastagnoliPmullX12Eor3(data[:prefixLen], uintptr(prefixLen/192))
+		} else {
+			crc = crc32CastagnoliPmullX12(data[:prefixLen], uintptr(prefixLen/192))
+		}
+		if prefixLen != len(data) {
+			crc = combineCastagnoliCached(crc, checksumCastagnoliFallback(data[prefixLen:]), int64(len(data)-prefixLen))
+		}
+		return crc
+	}
 	if len(data) < castagnoliFourWayThreshold {
 		return checksumCastagnoliFallback(data)
 	}
@@ -97,7 +118,7 @@ func updateIEEEFast(crc uint32, p []byte) uint32 {
 }
 
 func updateCastagnoliFast(crc uint32, p []byte) uint32 {
-	if !hasARM64CRC32() || len(p) < castagnoliFourWayThreshold {
+	if !hasARM64CRC32() || len(p) < pmullX12Threshold || (len(p) < castagnoliFourWayThreshold && !hasARM64PMULL()) {
 		return updateCastagnoliFallback(crc, p)
 	}
 	return combineCastagnoliCached(crc, checksumCastagnoli(p), int64(len(p)))
