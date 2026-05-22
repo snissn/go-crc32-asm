@@ -10,6 +10,10 @@ import (
 
 var benchSink uint32
 
+type binaryAppender interface {
+	AppendBinary([]byte) ([]byte, error)
+}
+
 func requireBinaryMarshaler(t *testing.T, name string, h hash.Hash32) encoding.BinaryMarshaler {
 	t.Helper()
 	marshaler, ok := h.(encoding.BinaryMarshaler)
@@ -26,6 +30,22 @@ func requireBinaryUnmarshaler(t *testing.T, name string, h hash.Hash32) encoding
 		t.Fatalf("%s hash does not implement encoding.BinaryUnmarshaler", name)
 	}
 	return unmarshaler
+}
+
+func requireBinaryAppender(t *testing.T, name string, h hash.Hash32) binaryAppender {
+	t.Helper()
+	appender, ok := h.(binaryAppender)
+	if !ok {
+		t.Fatalf("%s hash does not implement AppendBinary", name)
+	}
+	return appender
+}
+
+func mismatchedTable(tab *Table) *Table {
+	if tab == IEEETable {
+		return MakeTable(Castagnoli)
+	}
+	return IEEETable
 }
 
 func TestChecksumIEEE(t *testing.T) {
@@ -202,35 +222,70 @@ func TestStdlibCompatibleHash32(t *testing.T) {
 
 func TestStdlibCompatibleHashBinaryState(t *testing.T) {
 	data := makeInput(65536)
-	fast := NewIEEE()
-	std := crc32.NewIEEE()
-	_, _ = fast.Write(data[:12345])
-	_, _ = std.Write(data[:12345])
+	for _, tc := range []struct {
+		name    string
+		stdTab  *crc32.Table
+		fastTab *Table
+	}{
+		{name: "IEEE", stdTab: crc32.IEEETable, fastTab: IEEETable},
+		{name: "Castagnoli", stdTab: crc32.MakeTable(crc32.Castagnoli), fastTab: MakeTable(Castagnoli)},
+		{name: "Koopman", stdTab: crc32.MakeTable(crc32.Koopman), fastTab: MakeTable(Koopman)},
+		{name: "Custom", stdTab: crc32.MakeTable(0xd5828281), fastTab: MakeTable(0xd5828281)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fast := New(tc.fastTab)
+			std := crc32.New(tc.stdTab)
+			_, _ = fast.Write(data[:12345])
+			_, _ = std.Write(data[:12345])
 
-	fastMarshaler := requireBinaryMarshaler(t, "fast", fast)
-	stdMarshaler := requireBinaryMarshaler(t, "stdlib", std)
-	fastState, err := fastMarshaler.MarshalBinary()
-	if err != nil {
-		t.Fatalf("fast MarshalBinary: %v", err)
-	}
-	stdState, err := stdMarshaler.MarshalBinary()
-	if err != nil {
-		t.Fatalf("stdlib MarshalBinary: %v", err)
-	}
-	if !bytes.Equal(fastState, stdState) {
-		t.Fatalf("MarshalBinary mismatch got=%x want=%x", fastState, stdState)
-	}
+			fastMarshaler := requireBinaryMarshaler(t, "fast", fast)
+			stdMarshaler := requireBinaryMarshaler(t, "stdlib", std)
+			fastState, err := fastMarshaler.MarshalBinary()
+			if err != nil {
+				t.Fatalf("fast MarshalBinary: %v", err)
+			}
+			stdState, err := stdMarshaler.MarshalBinary()
+			if err != nil {
+				t.Fatalf("stdlib MarshalBinary: %v", err)
+			}
+			if !bytes.Equal(fastState, stdState) {
+				t.Fatalf("MarshalBinary mismatch got=%x want=%x", fastState, stdState)
+			}
 
-	restored := NewIEEE()
-	if err := requireBinaryUnmarshaler(t, "restored", restored).UnmarshalBinary(fastState); err != nil {
-		t.Fatalf("UnmarshalBinary: %v", err)
-	}
-	_, _ = restored.Write(data[12345:])
-	if got, want := restored.Sum32(), crc32.ChecksumIEEE(data); got != want {
-		t.Fatalf("restored Sum32 got=%08x want=%08x", got, want)
-	}
+			fastAppendState, err := requireBinaryAppender(t, "fast", fast).AppendBinary([]byte("state:"))
+			if err != nil {
+				t.Fatalf("fast AppendBinary: %v", err)
+			}
+			if stdAppender, ok := std.(binaryAppender); ok {
+				stdAppendState, err := stdAppender.AppendBinary([]byte("state:"))
+				if err != nil {
+					t.Fatalf("stdlib AppendBinary: %v", err)
+				}
+				if !bytes.Equal(fastAppendState, stdAppendState) {
+					t.Fatalf("AppendBinary mismatch got=%x want=%x", fastAppendState, stdAppendState)
+				}
+			} else if want := append([]byte("state:"), fastState...); !bytes.Equal(fastAppendState, want) {
+				t.Fatalf("AppendBinary fallback mismatch got=%x want=%x", fastAppendState, want)
+			}
 
-	cloneHashForTest(t, fast, data[12345:], crc32.ChecksumIEEE(data))
+			restored := New(tc.fastTab)
+			if err := requireBinaryUnmarshaler(t, "restored", restored).UnmarshalBinary(fastState); err != nil {
+				t.Fatalf("UnmarshalBinary: %v", err)
+			}
+			_, _ = restored.Write(data[12345:])
+			want := crc32.Checksum(data, tc.stdTab)
+			if got := restored.Sum32(); got != want {
+				t.Fatalf("restored Sum32 got=%08x want=%08x", got, want)
+			}
+
+			mismatched := New(mismatchedTable(tc.fastTab))
+			if err := requireBinaryUnmarshaler(t, "mismatched", mismatched).UnmarshalBinary(fastState); err == nil {
+				t.Fatalf("UnmarshalBinary succeeded with mismatched table")
+			}
+
+			cloneHashForTest(t, fast, data[12345:], want)
+		})
+	}
 }
 
 func TestChecksumIEEEEdges(t *testing.T) {
@@ -391,6 +446,73 @@ func BenchmarkUpdateNonZero(b *testing.B) {
 				benchSink ^= crc32.Update(castagnoliSeed, stdCastagnoliTab, data)
 			}
 		})
+	}
+}
+
+func BenchmarkHashWrite(b *testing.B) {
+	stdCastagnoliTab := crc32.MakeTable(crc32.Castagnoli)
+	pkgCastagnoliTab := MakeTable(Castagnoli)
+	data := makeInput(1 << 20)
+
+	for _, chunk := range []struct {
+		name string
+		n    int
+	}{
+		{name: "64B", n: 64},
+		{name: "4KiB", n: 4 << 10},
+		{name: "64KiB", n: 64 << 10},
+		{name: "1MiB", n: 1 << 20},
+	} {
+		b.Run(chunk.name+"/IEEE/package", func(b *testing.B) {
+			h := NewIEEE()
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				h.Reset()
+				writeChunks(b, h, data, chunk.n)
+				benchSink ^= h.Sum32()
+			}
+		})
+		b.Run(chunk.name+"/IEEE/stdlib", func(b *testing.B) {
+			h := crc32.NewIEEE()
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				h.Reset()
+				writeChunks(b, h, data, chunk.n)
+				benchSink ^= h.Sum32()
+			}
+		})
+		b.Run(chunk.name+"/Castagnoli/package", func(b *testing.B) {
+			h := New(pkgCastagnoliTab)
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				h.Reset()
+				writeChunks(b, h, data, chunk.n)
+				benchSink ^= h.Sum32()
+			}
+		})
+		b.Run(chunk.name+"/Castagnoli/stdlib", func(b *testing.B) {
+			h := crc32.New(stdCastagnoliTab)
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				h.Reset()
+				writeChunks(b, h, data, chunk.n)
+				benchSink ^= h.Sum32()
+			}
+		})
+	}
+}
+
+func writeChunks(b *testing.B, h hash.Hash32, data []byte, chunkLen int) {
+	b.Helper()
+	for off := 0; off < len(data); {
+		end := off + chunkLen
+		if end > len(data) {
+			end = len(data)
+		}
+		if n, err := h.Write(data[off:end]); n != end-off || err != nil {
+			b.Fatalf("Write n=%d err=%v", n, err)
+		}
+		off = end
 	}
 }
 

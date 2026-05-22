@@ -168,14 +168,26 @@ func updateCastagnoliFallback(crc uint32, p []byte) uint32 {
 
 func updateIEEE(crc uint32, p []byte) uint32 {
 	if crc == 0 {
+		if useIEEEFallback(crc, len(p)) {
+			return checksumIEEEFallback(p)
+		}
 		return checksumIEEE(p)
+	}
+	if useIEEEFallback(crc, len(p)) {
+		return updateIEEEFallback(crc, p)
 	}
 	return updateIEEEFast(crc, p)
 }
 
 func updateCastagnoli(crc uint32, p []byte) uint32 {
 	if crc == 0 {
+		if useCastagnoliFallback(crc, len(p)) {
+			return checksumCastagnoliFallback(p)
+		}
 		return checksumCastagnoli(p)
+	}
+	if useCastagnoliFallback(crc, len(p)) {
+		return updateCastagnoliFallback(crc, p)
 	}
 	return updateCastagnoliFast(crc, p)
 }

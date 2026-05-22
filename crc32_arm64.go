@@ -3,12 +3,28 @@
 package crc32asm
 
 const fourWayThreshold = 16 << 10
+const castagnoliFourWayThreshold = 4 << 10
 const pmullX12Threshold = 3 * 192
 
 func crc32IEEE4Way(p []byte, chunkLen uintptr) (uint32, uint32, uint32, uint32)
 func crc32Castagnoli4Way(p []byte, chunkLen uintptr) (uint32, uint32, uint32, uint32)
 func crc32IEEEPmullX12(p []byte, blocks uintptr) uint32
 func crc32IEEEPmullX12Eor3(p []byte, blocks uintptr) uint32
+
+func useIEEEFallback(crc uint32, n int) bool {
+	if !hasARM64CRC32() {
+		return true
+	}
+	hasPMULL := hasARM64PMULL()
+	if crc == 0 || hasPMULL {
+		return !(hasPMULL && n >= pmullX12Threshold) && n < fourWayThreshold
+	}
+	return n < fourWayThreshold
+}
+
+func useCastagnoliFallback(crc uint32, n int) bool {
+	return !hasARM64CRC32() || n < castagnoliFourWayThreshold
+}
 
 func checksumIEEE(data []byte) uint32 {
 	if !hasARM64CRC32() {
@@ -52,7 +68,7 @@ func checksumCastagnoli(data []byte) uint32 {
 	if !hasARM64CRC32() {
 		return checksumCastagnoliFallback(data)
 	}
-	if len(data) < fourWayThreshold {
+	if len(data) < castagnoliFourWayThreshold {
 		return checksumCastagnoliFallback(data)
 	}
 
@@ -74,14 +90,14 @@ func checksumCastagnoli(data []byte) uint32 {
 }
 
 func updateIEEEFast(crc uint32, p []byte) uint32 {
-	if !hasARM64CRC32() || len(p) < fourWayThreshold {
+	if !hasARM64CRC32() || len(p) < pmullX12Threshold || (len(p) < fourWayThreshold && !hasARM64PMULL()) {
 		return updateIEEEFallback(crc, p)
 	}
 	return combineIEEECached(crc, checksumIEEE(p), int64(len(p)))
 }
 
 func updateCastagnoliFast(crc uint32, p []byte) uint32 {
-	if !hasARM64CRC32() || len(p) < fourWayThreshold {
+	if !hasARM64CRC32() || len(p) < castagnoliFourWayThreshold {
 		return updateCastagnoliFallback(crc, p)
 	}
 	return combineCastagnoliCached(crc, checksumCastagnoli(p), int64(len(p)))

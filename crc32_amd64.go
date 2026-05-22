@@ -10,6 +10,14 @@ func crc32IEEEPCLMUL8(crc uint32, p []byte) uint32
 func crc32IEEEVPCLMUL256(crc uint32, p []byte) uint32
 func crc32IEEEVPCLMUL512(crc uint32, p []byte) uint32
 
+func useIEEEFallback(crc uint32, n int) bool {
+	return !cpu.X86.HasPCLMULQDQ || !cpu.X86.HasSSE41 || n < pclmul8Threshold
+}
+
+func useCastagnoliFallback(crc uint32, n int) bool {
+	return true
+}
+
 func checksumIEEE(data []byte) uint32 {
 	if !cpu.X86.HasPCLMULQDQ || !cpu.X86.HasSSE41 || len(data) < pclmul8Threshold {
 		return checksumIEEEFallback(data)

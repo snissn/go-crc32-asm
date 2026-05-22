@@ -2,6 +2,14 @@
 
 package crc32asm
 
+func useIEEEFallback(crc uint32, n int) bool {
+	return true
+}
+
+func useCastagnoliFallback(crc uint32, n int) bool {
+	return true
+}
+
 func checksumIEEE(data []byte) uint32 {
 	return checksumIEEEFallback(data)
 }
