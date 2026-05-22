@@ -193,7 +193,9 @@ func combineCached(cache *sync.Map, poly uint32, crc1, crc2 uint32, len2 int64) 
 
 func zeroAppendOperator(cache *sync.Map, poly uint32, len2 int64) [32]uint32 {
 	if cached, ok := cache.Load(len2); ok {
-		return cached.([32]uint32)
+		if op, ok := cached.([32]uint32); ok {
+			return op
+		}
 	}
 
 	var op [32]uint32
@@ -201,7 +203,10 @@ func zeroAppendOperator(cache *sync.Map, poly uint32, len2 int64) [32]uint32 {
 		op[n] = combineCRC(poly, 1<<n, 0, len2)
 	}
 	actual, _ := cache.LoadOrStore(len2, op)
-	return actual.([32]uint32)
+	if result, ok := actual.([32]uint32); ok {
+		return result
+	}
+	return op
 }
 
 func combineIEEE(crc1, crc2 uint32, len2 int64) uint32 {
