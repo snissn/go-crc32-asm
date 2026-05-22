@@ -53,6 +53,13 @@ func BenchmarkGomapHashTournamentSlice(b *testing.B) {
 			}
 		})
 
+		b.Run(size.name+"/CRC32C_Castagnoli_Package", func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				tournamentSink32 ^= ChecksumCastagnoli(data)
+			}
+		})
+
 		b.Run(size.name+"/CRC32C_Castagnoli_Stdlib", func(b *testing.B) {
 			b.SetBytes(int64(len(data)))
 			for i := 0; i < b.N; i++ {
