@@ -357,3 +357,46 @@ zfold_down:
 	VZEROUPPER
 	MOVL AX, ret+32(FP)
 	RET
+
+// func crc32Castagnoli4Way(p []byte, chunkLen uintptr) (uint32, uint32, uint32, uint32)
+// p length must be at least chunkLen*4, and chunkLen must be a positive multiple of 8 bytes.
+TEXT ·crc32Castagnoli4Way(SB), NOSPLIT, $0-48
+	MOVQ p_base+0(FP), SI
+	MOVQ chunkLen+24(FP), CX
+
+	MOVQ SI, DI
+	ADDQ CX, DI
+	MOVQ DI, R8
+	ADDQ CX, R8
+	MOVQ R8, R9
+	ADDQ CX, R9
+
+	MOVL $0xffffffff, AX
+	MOVL $0xffffffff, BX
+	MOVL $0xffffffff, R10
+	MOVL $0xffffffff, R11
+
+castagnoli4_loop8:
+	CMPQ CX, $8
+	JL castagnoli4_done
+	CRC32Q (SI), AX
+	CRC32Q (DI), BX
+	CRC32Q (R8), R10
+	CRC32Q (R9), R11
+	ADDQ $8, SI
+	ADDQ $8, DI
+	ADDQ $8, R8
+	ADDQ $8, R9
+	SUBQ $8, CX
+	JMP castagnoli4_loop8
+
+castagnoli4_done:
+	NOTL AX
+	NOTL BX
+	NOTL R10
+	NOTL R11
+	MOVL AX, ret+32(FP)
+	MOVL BX, ret1+36(FP)
+	MOVL R10, ret2+40(FP)
+	MOVL R11, ret3+44(FP)
+	RET
