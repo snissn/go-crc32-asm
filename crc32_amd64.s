@@ -147,6 +147,97 @@ DATA ·amd64ZToYMult+0x10(SB)/8, $0x00000000f1da05aa
 DATA ·amd64ZToYMult+0x18(SB)/8, $0x0000000081256527
 GLOBL ·amd64ZToYMult(SB), RODATA, $32
 
+
+DATA ·amd64CastagnoliMult8+0x00(SB)/8, $0x000000006992cea2
+DATA ·amd64CastagnoliMult8+0x08(SB)/8, $0x000000000d3b6092
+GLOBL ·amd64CastagnoliMult8(SB), RODATA, $16
+
+DATA ·amd64CastagnoliMult4+0x00(SB)/8, $0x00000000740eef02
+DATA ·amd64CastagnoliMult4+0x08(SB)/8, $0x000000009e4addf8
+GLOBL ·amd64CastagnoliMult4(SB), RODATA, $16
+
+DATA ·amd64CastagnoliMult2+0x00(SB)/8, $0x000000003da6d0cb
+DATA ·amd64CastagnoliMult2+0x08(SB)/8, $0x00000000ba4fc28e
+GLOBL ·amd64CastagnoliMult2(SB), RODATA, $16
+
+DATA ·amd64CastagnoliMult1+0x00(SB)/8, $0x00000000f20c0dfe
+DATA ·amd64CastagnoliMult1+0x08(SB)/8, $0x00000000493c7d27
+GLOBL ·amd64CastagnoliMult1(SB), RODATA, $16
+
+DATA ·amd64CastagnoliBarrett+0x00(SB)/8, $0x4869ec38dea713f1
+DATA ·amd64CastagnoliBarrett+0x08(SB)/8, $0x0000000105ec76f1
+GLOBL ·amd64CastagnoliBarrett(SB), RODATA, $16
+
+DATA ·amd64CastagnoliVMult8+0x00(SB)/8, $0x00000000dcb17aa4
+DATA ·amd64CastagnoliVMult8+0x08(SB)/8, $0x00000000b9e02b86
+DATA ·amd64CastagnoliVMult8+0x10(SB)/8, $0x00000000dcb17aa4
+DATA ·amd64CastagnoliVMult8+0x18(SB)/8, $0x00000000b9e02b86
+GLOBL ·amd64CastagnoliVMult8(SB), RODATA, $32
+
+DATA ·amd64CastagnoliVMult4+0x00(SB)/8, $0x000000006992cea2
+DATA ·amd64CastagnoliVMult4+0x08(SB)/8, $0x000000000d3b6092
+DATA ·amd64CastagnoliVMult4+0x10(SB)/8, $0x000000006992cea2
+DATA ·amd64CastagnoliVMult4+0x18(SB)/8, $0x000000000d3b6092
+GLOBL ·amd64CastagnoliVMult4(SB), RODATA, $32
+
+DATA ·amd64CastagnoliVMult2+0x00(SB)/8, $0x00000000740eef02
+DATA ·amd64CastagnoliVMult2+0x08(SB)/8, $0x000000009e4addf8
+DATA ·amd64CastagnoliVMult2+0x10(SB)/8, $0x00000000740eef02
+DATA ·amd64CastagnoliVMult2+0x18(SB)/8, $0x000000009e4addf8
+GLOBL ·amd64CastagnoliVMult2(SB), RODATA, $32
+
+DATA ·amd64CastagnoliVMult1+0x00(SB)/8, $0x000000003da6d0cb
+DATA ·amd64CastagnoliVMult1+0x08(SB)/8, $0x00000000ba4fc28e
+DATA ·amd64CastagnoliVMult1+0x10(SB)/8, $0x000000003da6d0cb
+DATA ·amd64CastagnoliVMult1+0x18(SB)/8, $0x00000000ba4fc28e
+GLOBL ·amd64CastagnoliVMult1(SB), RODATA, $32
+
+DATA ·amd64CastagnoliZMult8+0x00(SB)/8, $0x00000000bd6f81f8
+DATA ·amd64CastagnoliZMult8+0x08(SB)/8, $0x00000000dd7e3b0c
+DATA ·amd64CastagnoliZMult8+0x10(SB)/8, $0x00000000bd6f81f8
+DATA ·amd64CastagnoliZMult8+0x18(SB)/8, $0x00000000dd7e3b0c
+DATA ·amd64CastagnoliZMult8+0x20(SB)/8, $0x00000000bd6f81f8
+DATA ·amd64CastagnoliZMult8+0x28(SB)/8, $0x00000000dd7e3b0c
+DATA ·amd64CastagnoliZMult8+0x30(SB)/8, $0x00000000bd6f81f8
+DATA ·amd64CastagnoliZMult8+0x38(SB)/8, $0x00000000dd7e3b0c
+GLOBL ·amd64CastagnoliZMult8(SB), RODATA, $64
+
+DATA ·amd64CastagnoliZMult4+0x00(SB)/8, $0x00000000dcb17aa4
+DATA ·amd64CastagnoliZMult4+0x08(SB)/8, $0x00000000b9e02b86
+DATA ·amd64CastagnoliZMult4+0x10(SB)/8, $0x00000000dcb17aa4
+DATA ·amd64CastagnoliZMult4+0x18(SB)/8, $0x00000000b9e02b86
+DATA ·amd64CastagnoliZMult4+0x20(SB)/8, $0x00000000dcb17aa4
+DATA ·amd64CastagnoliZMult4+0x28(SB)/8, $0x00000000b9e02b86
+DATA ·amd64CastagnoliZMult4+0x30(SB)/8, $0x00000000dcb17aa4
+DATA ·amd64CastagnoliZMult4+0x38(SB)/8, $0x00000000b9e02b86
+GLOBL ·amd64CastagnoliZMult4(SB), RODATA, $64
+
+DATA ·amd64CastagnoliZMult2+0x00(SB)/8, $0x000000006992cea2
+DATA ·amd64CastagnoliZMult2+0x08(SB)/8, $0x000000000d3b6092
+DATA ·amd64CastagnoliZMult2+0x10(SB)/8, $0x000000006992cea2
+DATA ·amd64CastagnoliZMult2+0x18(SB)/8, $0x000000000d3b6092
+DATA ·amd64CastagnoliZMult2+0x20(SB)/8, $0x000000006992cea2
+DATA ·amd64CastagnoliZMult2+0x28(SB)/8, $0x000000000d3b6092
+DATA ·amd64CastagnoliZMult2+0x30(SB)/8, $0x000000006992cea2
+DATA ·amd64CastagnoliZMult2+0x38(SB)/8, $0x000000000d3b6092
+GLOBL ·amd64CastagnoliZMult2(SB), RODATA, $64
+
+DATA ·amd64CastagnoliZMult1+0x00(SB)/8, $0x00000000740eef02
+DATA ·amd64CastagnoliZMult1+0x08(SB)/8, $0x000000009e4addf8
+DATA ·amd64CastagnoliZMult1+0x10(SB)/8, $0x00000000740eef02
+DATA ·amd64CastagnoliZMult1+0x18(SB)/8, $0x000000009e4addf8
+DATA ·amd64CastagnoliZMult1+0x20(SB)/8, $0x00000000740eef02
+DATA ·amd64CastagnoliZMult1+0x28(SB)/8, $0x000000009e4addf8
+DATA ·amd64CastagnoliZMult1+0x30(SB)/8, $0x00000000740eef02
+DATA ·amd64CastagnoliZMult1+0x38(SB)/8, $0x000000009e4addf8
+GLOBL ·amd64CastagnoliZMult1(SB), RODATA, $64
+
+DATA ·amd64CastagnoliZToYMult+0x00(SB)/8, $0x000000003da6d0cb
+DATA ·amd64CastagnoliZToYMult+0x08(SB)/8, $0x00000000ba4fc28e
+DATA ·amd64CastagnoliZToYMult+0x10(SB)/8, $0x000000003da6d0cb
+DATA ·amd64CastagnoliZToYMult+0x18(SB)/8, $0x00000000ba4fc28e
+GLOBL ·amd64CastagnoliZToYMult(SB), RODATA, $32
+
 // func crc32IEEEPCLMUL8(crc uint32, p []byte) uint32
 // p length must be a positive multiple of 128 bytes.
 TEXT ·crc32IEEEPCLMUL8(SB), NOSPLIT, $0-36
@@ -348,6 +439,217 @@ zfold_down:
 	PXOR X2, X1
 
 	MOVOA ·amd64Barrett(SB), X0
+	MOVO X1, X2
+	PCLMULQDQ $0x00, X0, X2
+	PCLMULQDQ $0x10, X0, X2
+	PXOR X2, X1
+
+	PEXTRD $2, X1, AX
+	VZEROUPPER
+	MOVL AX, ret+32(FP)
+	RET
+
+// func crc32CastagnoliPCLMUL8(crc uint32, p []byte) uint32
+// p length must be a positive multiple of 128 bytes.
+TEXT ·crc32CastagnoliPCLMUL8(SB), NOSPLIT, $0-36
+	MOVL crc+0(FP), X0
+	MOVQ p_base+8(FP), SI
+	MOVQ p_len+16(FP), CX
+
+	MOVOU 0(SI), X1
+	MOVOU 16(SI), X2
+	MOVOU 32(SI), X3
+	MOVOU 48(SI), X4
+	MOVOU 64(SI), X5
+	MOVOU 80(SI), X6
+	MOVOU 96(SI), X7
+	MOVOU 112(SI), X8
+	PXOR X0, X1
+	ADDQ $128, SI
+	SUBQ $128, CX
+	JZ c_fold_down
+
+	MOVOA ·amd64CastagnoliMult8(SB), X0
+
+c_loop128:
+	FOLD_MEM(X1, 0)
+	FOLD_MEM(X2, 16)
+	FOLD_MEM(X3, 32)
+	FOLD_MEM(X4, 48)
+	FOLD_MEM(X5, 64)
+	FOLD_MEM(X6, 80)
+	FOLD_MEM(X7, 96)
+	FOLD_MEM(X8, 112)
+	ADDQ $128, SI
+	SUBQ $128, CX
+	JNZ c_loop128
+
+c_fold_down:
+	MOVOA ·amd64CastagnoliMult4(SB), X0
+	FOLD_REG(X1, X5)
+	FOLD_REG(X2, X6)
+	FOLD_REG(X3, X7)
+	FOLD_REG(X4, X8)
+
+	MOVOA ·amd64CastagnoliMult2(SB), X0
+	FOLD_REG(X5, X7)
+	FOLD_REG(X6, X8)
+
+	MOVOA ·amd64CastagnoliMult1(SB), X0
+	FOLD_REG(X7, X8)
+
+	MOVO X8, X1
+	MOVO X1, X2
+	PCLMULQDQ $0x10, X0, X1
+	PSRLDQ $8, X2
+	PXOR X2, X1
+
+	MOVOA ·amd64CastagnoliBarrett(SB), X0
+	MOVO X1, X2
+	PCLMULQDQ $0x00, X0, X2
+	PCLMULQDQ $0x10, X0, X2
+	PXOR X2, X1
+
+	PEXTRD $2, X1, AX
+	MOVL AX, ret+32(FP)
+	RET
+
+// func crc32CastagnoliVPCLMUL256(crc uint32, p []byte) uint32
+// p length must be a positive multiple of 256 bytes.
+TEXT ·crc32CastagnoliVPCLMUL256(SB), NOSPLIT, $0-36
+	MOVL crc+0(FP), X0
+	MOVQ p_base+8(FP), SI
+	MOVQ p_len+16(FP), CX
+
+	VMOVDQU 0(SI), Y1
+	VMOVDQU 32(SI), Y2
+	VMOVDQU 64(SI), Y3
+	VMOVDQU 96(SI), Y4
+	VMOVDQU 128(SI), Y5
+	VMOVDQU 160(SI), Y6
+	VMOVDQU 192(SI), Y7
+	VMOVDQU 224(SI), Y8
+	VPXOR Y0, Y1, Y1
+	ADDQ $256, SI
+	SUBQ $256, CX
+	JZ vc_fold_down
+
+	VMOVDQA ·amd64CastagnoliVMult8(SB), Y0
+
+c_vloop256:
+	VFOLD_MEM(Y1, 0)
+	VFOLD_MEM(Y2, 32)
+	VFOLD_MEM(Y3, 64)
+	VFOLD_MEM(Y4, 96)
+	VFOLD_MEM(Y5, 128)
+	VFOLD_MEM(Y6, 160)
+	VFOLD_MEM(Y7, 192)
+	VFOLD_MEM(Y8, 224)
+	ADDQ $256, SI
+	SUBQ $256, CX
+	JNZ c_vloop256
+
+vc_fold_down:
+	VMOVDQA ·amd64CastagnoliVMult4(SB), Y0
+	VFOLD_REG(Y1, Y5)
+	VFOLD_REG(Y2, Y6)
+	VFOLD_REG(Y3, Y7)
+	VFOLD_REG(Y4, Y8)
+
+	VMOVDQA ·amd64CastagnoliVMult2(SB), Y0
+	VFOLD_REG(Y5, Y7)
+	VFOLD_REG(Y6, Y8)
+
+	VMOVDQA ·amd64CastagnoliVMult1(SB), Y0
+	VFOLD_REG(Y7, Y8)
+
+	VEXTRACTI128 $1, Y8, X2
+	MOVOA ·amd64CastagnoliMult1(SB), X0
+	VFOLD128_REG(X8, X2)
+
+	MOVO X2, X1
+	MOVO X1, X2
+	PCLMULQDQ $0x10, X0, X1
+	PSRLDQ $8, X2
+	PXOR X2, X1
+
+	MOVOA ·amd64CastagnoliBarrett(SB), X0
+	MOVO X1, X2
+	PCLMULQDQ $0x00, X0, X2
+	PCLMULQDQ $0x10, X0, X2
+	PXOR X2, X1
+
+	PEXTRD $2, X1, AX
+	VZEROUPPER
+	MOVL AX, ret+32(FP)
+	RET
+
+// func crc32CastagnoliVPCLMUL512(crc uint32, p []byte) uint32
+// p length must be a positive multiple of 512 bytes.
+TEXT ·crc32CastagnoliVPCLMUL512(SB), NOSPLIT, $0-36
+	MOVL crc+0(FP), AX
+	MOVQ p_base+8(FP), SI
+	MOVQ p_len+16(FP), CX
+	VPXORQ Z0, Z0, Z0
+	MOVL AX, X0
+
+	VMOVDQU64 0(SI), Z1
+	VMOVDQU64 64(SI), Z2
+	VMOVDQU64 128(SI), Z3
+	VMOVDQU64 192(SI), Z4
+	VMOVDQU64 256(SI), Z5
+	VMOVDQU64 320(SI), Z6
+	VMOVDQU64 384(SI), Z7
+	VMOVDQU64 448(SI), Z8
+	PXOR X0, X1
+	ADDQ $512, SI
+	SUBQ $512, CX
+	JZ zc_fold_down
+
+	VMOVDQU64 ·amd64CastagnoliZMult8(SB), Z0
+
+c_zloop512:
+	ZFOLD_MEM(Z1, 0)
+	ZFOLD_MEM(Z2, 64)
+	ZFOLD_MEM(Z3, 128)
+	ZFOLD_MEM(Z4, 192)
+	ZFOLD_MEM(Z5, 256)
+	ZFOLD_MEM(Z6, 320)
+	ZFOLD_MEM(Z7, 384)
+	ZFOLD_MEM(Z8, 448)
+	ADDQ $512, SI
+	SUBQ $512, CX
+	JNZ c_zloop512
+
+zc_fold_down:
+	VMOVDQU64 ·amd64CastagnoliZMult4(SB), Z0
+	ZFOLD_REG(Z1, Z5)
+	ZFOLD_REG(Z2, Z6)
+	ZFOLD_REG(Z3, Z7)
+	ZFOLD_REG(Z4, Z8)
+
+	VMOVDQU64 ·amd64CastagnoliZMult2(SB), Z0
+	ZFOLD_REG(Z5, Z7)
+	ZFOLD_REG(Z6, Z8)
+
+	VMOVDQU64 ·amd64CastagnoliZMult1(SB), Z0
+	ZFOLD_REG(Z7, Z8)
+
+	VEXTRACTI64X4 $1, Z8, Y2
+	VMOVDQA ·amd64CastagnoliZToYMult(SB), Y0
+	ZFOLD256_REG(Y8, Y2)
+
+	VEXTRACTI128 $1, Y2, X8
+	MOVOA ·amd64CastagnoliMult1(SB), X0
+	VFOLD128_REG(X2, X8)
+
+	MOVO X8, X1
+	MOVO X1, X2
+	PCLMULQDQ $0x10, X0, X1
+	PSRLDQ $8, X2
+	PXOR X2, X1
+
+	MOVOA ·amd64CastagnoliBarrett(SB), X0
 	MOVO X1, X2
 	PCLMULQDQ $0x00, X0, X2
 	PCLMULQDQ $0x10, X0, X2
