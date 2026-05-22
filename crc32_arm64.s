@@ -480,12 +480,12 @@ TEXT ·crc32CastagnoliPmullX12Eor3(SB),NOSPLIT,$0-32
 	VEOR	V16.B16, V0.B16, V0.B16
 
 	SUB	$1, R1
-	CBZ	R1, eor3_castagnoli_castagnoli_eor3_eor3_fold_down
+	CBZ	R1, eor3_castagnoli_fold_down
 
 	MOVD	$·castagnoliMult12(SB), R2
 	VLD1	(R2), [V12.B16]
 
-eor3_castagnoli_castagnoli_eor3_eor3_loop192:
+eor3_castagnoli_loop192:
 	VLD1.P	64(R0), [V20.B16, V21.B16, V22.B16, V23.B16]
 	VLD1.P	64(R0), [V24.B16, V25.B16, V26.B16, V27.B16]
 	VLD1.P	64(R0), [V28.B16, V29.B16, V30.B16, V31.B16]
@@ -514,9 +514,9 @@ eor3_castagnoli_castagnoli_eor3_eor3_loop192:
 	VMOV	V30.B16, V10.B16
 	VMOV	V31.B16, V11.B16
 	SUB	$1, R1
-	CBNZ	R1, eor3_castagnoli_castagnoli_eor3_eor3_loop192
+	CBNZ	R1, eor3_castagnoli_loop192
 
-eor3_castagnoli_castagnoli_eor3_eor3_fold_down:
+eor3_castagnoli_fold_down:
 	MOVD	$·castagnoliMult6(SB), R2
 	VLD1	(R2), [V12.B16]
 	FOLD_EOR3(V0, V6, V12, V17, V18)

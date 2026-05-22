@@ -118,7 +118,7 @@ func updateIEEEFast(crc uint32, p []byte) uint32 {
 }
 
 func updateCastagnoliFast(crc uint32, p []byte) uint32 {
-	if !hasARM64CRC32() || len(p) < castagnoliFourWayThreshold || (len(p) < pmullX12Threshold && !hasARM64PMULL()) {
+	if !hasARM64CRC32() || len(p) < pmullX12Threshold || (len(p) < castagnoliFourWayThreshold && !hasARM64PMULL()) {
 		return updateCastagnoliFallback(crc, p)
 	}
 	return combineCastagnoliCached(crc, checksumCastagnoli(p), int64(len(p)))
