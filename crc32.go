@@ -158,18 +158,26 @@ func checksumCastagnoliFallback(data []byte) uint32 {
 	return stdcrc32.Checksum(data, castagnoliTable)
 }
 
+func updateIEEEFallback(crc uint32, p []byte) uint32 {
+	return stdcrc32.Update(crc, IEEETable, p)
+}
+
+func updateCastagnoliFallback(crc uint32, p []byte) uint32 {
+	return stdcrc32.Update(crc, castagnoliTable, p)
+}
+
 func updateIEEE(crc uint32, p []byte) uint32 {
 	if crc == 0 {
 		return checksumIEEE(p)
 	}
-	return stdcrc32.Update(crc, IEEETable, p)
+	return updateIEEEFast(crc, p)
 }
 
 func updateCastagnoli(crc uint32, p []byte) uint32 {
 	if crc == 0 {
 		return checksumCastagnoli(p)
 	}
-	return stdcrc32.Update(crc, castagnoliTable, p)
+	return updateCastagnoliFast(crc, p)
 }
 
 var zeroAppendOps sync.Map

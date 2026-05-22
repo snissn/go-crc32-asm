@@ -72,3 +72,17 @@ func checksumCastagnoli(data []byte) uint32 {
 	}
 	return crc
 }
+
+func updateIEEEFast(crc uint32, p []byte) uint32 {
+	if !hasARM64CRC32() || len(p) < fourWayThreshold {
+		return updateIEEEFallback(crc, p)
+	}
+	return combineIEEECached(crc, checksumIEEE(p), int64(len(p)))
+}
+
+func updateCastagnoliFast(crc uint32, p []byte) uint32 {
+	if !hasARM64CRC32() || len(p) < fourWayThreshold {
+		return updateCastagnoliFallback(crc, p)
+	}
+	return combineCastagnoliCached(crc, checksumCastagnoli(p), int64(len(p)))
+}
