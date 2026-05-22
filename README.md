@@ -34,8 +34,8 @@ On `arm64`, CRC-32/IEEE uses `PMULL` folding over 12 adjacent 16-byte vectors
 for large buffers, then reduces with ARM CRC32 instructions. CPUs with SHA3 use
 `EOR3` in the fold.
 
-On `arm64`, CRC-32C/Castagnoli uses four independent ARM CRC32C streams and
-combines them with the Castagnoli polynomial.
+On `arm64`, CRC-32C/Castagnoli uses four independent ARM CRC32C streams from
+4 KiB upward and combines them with the Castagnoli polynomial.
 
 On `amd64`, CRC-32/IEEE uses carry-less multiply folding:
 
@@ -44,6 +44,19 @@ On `amd64`, CRC-32/IEEE uses carry-less multiply folding:
 - `PCLMULQDQ` + `SSE4.1`: eight 16-byte lanes.
 
 On `amd64`, CRC-32C/Castagnoli uses Go's optimized SSE4.2 CRC32C path.
+
+## Fallback Decisions
+
+The package keeps stdlib delegation where the delegated path is already the
+fast path:
+
+- `Koopman` and custom tables use `hash/crc32`.
+- `amd64` CRC-32C/Castagnoli uses Go's SSE4.2 implementation; on the tested
+  i5-11400F it matches this package and klauspost at storage-block sizes.
+- Tiny writes below the architecture thresholds route directly to `hash/crc32`
+  to avoid extra wrapper overhead.
+- `arm64` seeded CRC-32/IEEE uses the `PMULL` path plus CRC combine from 576 B
+  upward; CRC-32C/Castagnoli uses the four-stream path from 4 KiB upward.
 
 ## Benchmarks
 
@@ -98,6 +111,15 @@ Representative nonzero-seed `Update` throughput at 64 KiB to 1 MiB:
 
 Streaming `hash.Hash32` writes use the same `Update` paths. Large writes keep
 the fast-path behavior; tiny writes are mostly call overhead.
+
+Representative nonzero-seed `Update` throughput at 4 KiB:
+
+| Machine | Function | Package | Go stdlib |
+|---|---|---:|---:|
+| Apple M3 | CRC-32/IEEE `Update` | ~26-28 GB/s | ~10 GB/s |
+| Apple M3 | CRC-32C/Castagnoli `Update` | ~13-14 GB/s | ~10 GB/s |
+| Intel i5-11400F | CRC-32/IEEE `Update` | ~52-54 GB/s | ~23-24 GB/s |
+| Intel i5-11400F | CRC-32C/Castagnoli `Update` | ~29 GB/s | ~29-30 GB/s |
 
 The tournament conclusion from these runs is:
 
