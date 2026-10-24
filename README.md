@@ -47,6 +47,10 @@ On `amd64`, CRC-32/IEEE uses carry-less multiply folding:
 On `amd64`, CRC-32C/Castagnoli uses Castagnoli-specific carry-less multiply
 folding with the same `PCLMULQDQ`/`VPCLMULQDQ` feature tiers as the IEEE path.
 
+Both amd64 checksum paths continue the accelerated prefix CRC directly over a
+short remainder. They retain the same IEEE/Castagnoli results without combining
+two independently calculated checksums for the prefix and tail.
+
 ## Fallback Decisions
 
 The package keeps stdlib delegation where the delegated path is already the
@@ -65,6 +69,9 @@ Run the focused checksum benchmarks:
 ```sh
 go test -run '^$' -bench 'BenchmarkChecksumIEEE|BenchmarkChecksumCastagnoli' -benchtime=1s -count=3
 ```
+
+`BenchmarkChecksumIEEETails` includes stripe boundaries, short WAL frame sizes,
+and large aligned/unaligned lengths.
 
 Run seeded `Update` benchmarks:
 

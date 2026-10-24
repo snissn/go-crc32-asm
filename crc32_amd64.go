@@ -49,7 +49,9 @@ func checksumIEEE(data []byte) uint32 {
 		crc = ^crc32IEEEPCLMUL8(^uint32(0), data[:prefixLen])
 	}
 	if prefixLen != len(data) {
-		crc = combineIEEECached(crc, checksumIEEEFallback(data[prefixLen:]), int64(len(data)-prefixLen))
+		// The prefix CRC is already the continuation state. Extend it over the
+		// short remainder instead of calculating and combining a second CRC.
+		crc = updateIEEEFallback(crc, data[prefixLen:])
 	}
 	return crc
 }
